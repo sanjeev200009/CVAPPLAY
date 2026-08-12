@@ -22,11 +22,16 @@ RECRUITER_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Automated noise to ignore
+# Automated noise and auto-responder subjects to ignore
 IGNORE_SENDERS = (
-    "no-reply", "noreply", "mailer-daemon", "google.com", "github.com",
+    "no-reply", "noreply", "mailer-daemon", "postmaster", "google.com", "github.com",
     "linkedin.com", "facebookmail.com", "accounts.google.com", "bounce",
     "security-noreply", "notifications", "support@github.com",
+)
+
+AUTO_REPLY_SUBJECTS = re.compile(
+    r"\b(automatic reply|auto-reply|out of office|undeliverable|delivery status|failure notice)\b",
+    re.IGNORECASE,
 )
 
 
@@ -118,11 +123,13 @@ class InboxTracker:
                 subject = _decode_str(msg.get("Subject", ""))
                 date_str = _decode_str(msg.get("Date", ""))
 
-                # Skip emails sent by ourselves or known noise
+                # Skip emails sent by ourselves, auto-responders, or known noise
                 sender_lower = sender.lower()
                 if settings.email_user.lower() in sender_lower:
                     continue
                 if any(x in sender_lower for x in IGNORE_SENDERS):
+                    continue
+                if AUTO_REPLY_SUBJECTS.search(subject):
                     continue
 
                 # Extract text body snippet
