@@ -245,30 +245,38 @@ RULES:
                 settings.cover_letter_model, system, user, max_tokens=700, json_mode=False
             ).strip()
 
-            # Filter raw output by paragraphs, dropping reasoning / thinking thoughts
-            paragraphs = raw.split("\n\n")
-            real_paragraphs = []
-            for p in paragraphs:
-                p_str = p.strip()
-                if not p_str:
-                    continue
-                p_lower = p_str.lower()
-                if any(k in p_lower for k in ("thinking process", "analyze the request", "candidate has:", "jd says:", "candidate profile:", "rules:", "- **role:", "- **output:", "- **candidate:", "- **skills:", "- **company:", "- **job title:", "- **rules:")):
-                    continue
-                if p_str.startswith(("- **", "* **", "1. **", "2. **", "3. **")):
-                    continue
-                real_paragraphs.append(p_str)
+            # 1. Anchor directly to the beginning of the real application prose
+            match = re.search(r'\b(I am writing|I\'m writing|I write to|As a |With |My technical |Having )', raw, re.IGNORECASE)
+            if match:
+                text = raw[match.start():]
+            else:
+                text = raw
 
-            body_text = "\n\n".join(real_paragraphs).strip()
+            # 2. Filter out any inline labels or numbered draft bullets
+            lines = text.splitlines()
+            clean_lines = []
+            for line in lines:
+                l_strip = line.strip()
+                if not l_strip:
+                    clean_lines.append("")
+                    continue
+                l_lower = l_strip.lower()
+                if re.match(r'^\*?(paragraph\s+\d+|draft\s+\d+|drafting)\b', l_lower):
+                    continue
+                clean_lines.append(l_strip)
 
-            # Strip any accidental greeting or signature the LLM outputted
+            body_text = "\n".join(clean_lines).strip()
+
+            # 3. Strip any accidental greeting or signature the LLM outputted
             body_text = re.sub(r'^Dear\s+.*?\n+', '', body_text, flags=re.IGNORECASE).strip()
             body_text = re.sub(r'(Sincerely|Best regards|Thanks|Regards),?.*$', '', body_text, flags=re.IGNORECASE | re.DOTALL).strip()
+            body_text = re.sub(r'\n{3,}', '\n\n', body_text).strip()
 
             if body_text and len(body_text) > 80:
                 header = f"Dear Hiring Manager at {company},\n\n"
                 signature = f"\n\nSincerely,\n{settings.candidate_first_name} {settings.candidate_last_name}\nEmail: {settings.email_user}\nPhone: +94 753 883 167\nPortfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/\nGitHub: https://github.com/sanjeev200009\nLocation: Colombo, Sri Lanka"
                 return {"subject": subject, "body": f"{header}{body_text}{signature}"}
+
 
 
         except Exception as exc:
