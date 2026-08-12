@@ -212,7 +212,7 @@ Location: Colombo, Sri Lanka"""
 
         try:
             system = f"""You are a professional job application email writer. Write a compelling, 
-personalized job application email from a junior software developer to a recruiter.
+personalized job application email body (2 to 3 paragraphs, 150-200 words) from a junior software developer to a recruiter.
 
 CANDIDATE PROFILE:
 - Full Name: Sivasuthakaran Sanjeev
@@ -225,16 +225,14 @@ CANDIDATE PROFILE:
 - Core Skills: Python, FastAPI, React.js, Next.js, JavaScript, TypeScript, Node.js, PostgreSQL, REST APIs, WebSockets, Git, Docker basics, Linux
 
 RULES:
-1. Output ONLY the email body starting directly with "Dear Hiring Manager at [Company Name],".
-2. The email MUST be personalized to the SPECIFIC COMPANY NAME and SPECIFIC JOB TITLE.
+1. Write 2 to 3 body paragraphs explaining how the candidate's technical skills match the job description.
+2. The email MUST be personalized to the SPECIFIC COMPANY NAME ({company}) and SPECIFIC JOB TITLE ({job_title}).
 3. Identify 3-5 specific requirements from the job description that match the candidate's real skills.
 4. Use a professional but warm tone. Not robotic. Not generic.
-5. Keep the body between 180-250 words.
-6. End with FULL contact info block (name, email, phone, portfolio, GitHub).
-7. DO NOT invent skills, fake projects, or false experience.
-8. DO NOT mention salary, expected compensation, or notice period anywhere in the email.
-9. Always attach a note that CV/resume is attached to this email.
-10. DO NOT output any thinking, reasoning, subject lines, headers, or notes."""
+5. DO NOT invent skills, fake projects, or false experience.
+6. DO NOT mention salary, expected compensation, or notice period anywhere.
+7. Include a note that CV/resume is attached to this email.
+8. Output ONLY the 2-3 body paragraphs. DO NOT output any reasoning, thinking process, greetings, headers, subject lines, or sign-offs."""
 
             user = (
                 f"COMPANY: {company}\n"
@@ -244,17 +242,33 @@ RULES:
                 f"CANDIDATE CV:\n{cv_text[:2500]}"
             )
             raw = self.chat(
-                settings.cover_letter_model, system, user, max_tokens=800, json_mode=False
+                settings.cover_letter_model, system, user, max_tokens=700, json_mode=False
             ).strip()
 
-            dear_idx = raw.rfind("Dear ")
-            if dear_idx != -1:
-                body_candidate = raw[dear_idx:].strip()
-                gh_match = re.search(r'(https://github\.com/[^\s\n]+)', body_candidate)
-                if gh_match:
-                    body_candidate = body_candidate[:gh_match.end()].strip()
-                if body_candidate and len(body_candidate) > 100:
-                    return {"subject": subject, "body": body_candidate}
+            # Filter raw output by paragraphs, dropping reasoning / thinking thoughts
+            paragraphs = raw.split("\n\n")
+            real_paragraphs = []
+            for p in paragraphs:
+                p_str = p.strip()
+                if not p_str:
+                    continue
+                p_lower = p_str.lower()
+                if any(k in p_lower for k in ("thinking process", "analyze the request", "candidate has:", "jd says:", "candidate profile:", "rules:", "- **role:", "- **output:", "- **candidate:", "- **skills:", "- **company:", "- **job title:", "- **rules:")):
+                    continue
+                if p_str.startswith(("- **", "* **", "1. **", "2. **", "3. **")):
+                    continue
+                real_paragraphs.append(p_str)
+
+            body_text = "\n\n".join(real_paragraphs).strip()
+
+            # Strip any accidental greeting or signature the LLM outputted
+            body_text = re.sub(r'^Dear\s+.*?\n+', '', body_text, flags=re.IGNORECASE).strip()
+            body_text = re.sub(r'(Sincerely|Best regards|Thanks|Regards),?.*$', '', body_text, flags=re.IGNORECASE | re.DOTALL).strip()
+
+            if body_text and len(body_text) > 80:
+                header = f"Dear Hiring Manager at {company},\n\n"
+                signature = f"\n\nSincerely,\n{settings.candidate_first_name} {settings.candidate_last_name}\nEmail: {settings.email_user}\nPhone: +94 753 883 167\nPortfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/\nGitHub: https://github.com/sanjeev200009\nLocation: Colombo, Sri Lanka"
+                return {"subject": subject, "body": f"{header}{body_text}{signature}"}
 
 
         except Exception as exc:
