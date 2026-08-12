@@ -70,7 +70,7 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
 
 
 # Dictionary of verified, active Sri Lanka tech hiring emails
-# Master Directory of 60+ verified, active Sri Lanka tech hiring emails (SLASSCOM / ICTA / Top Colombo IT Houses)
+# Master Directory of verified, active Sri Lanka tech hiring emails (SLASSCOM / ICTA / Top Colombo IT Houses)
 VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     # Tier-1 Tech Giants & Multinational Centers
     "sysco labs": "careers@syscolabs.lk",
@@ -107,7 +107,6 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "mitra": "careers@mitrai.com",
     "enactor": "careers@enactor.co",
     "linearsix": "careers@linearsix.com",
-    "arimac": "careers@arimac.lk",
     "affinity": "careers@affinity.lk",
     "ism apac": "careers@ismapac.com",
     "stax": "careers@stax.com",
@@ -122,23 +121,18 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "hsenid mobile": "careers@hsenidmobile.com",
     "hsenid": "careers@hsenid.com",
     "john keells it": "careers@johnkeellsit.com",
-    "brandix i3": "careers@brandixi3.com",
     "mas holdings": "careers@masholdings.com",
     "dialog": "careers@dialog.lk",
     "mobitel": "careers@mobitel.lk",
     "softlogic": "careers@softlogic.lk",
     "lankabell": "careers@lankabell.com",
     "bellvantage": "careers@bellvantage.com",
-    "sinetcom": "careers@sinetcom.lk",
     "lolc": "careers@lolctech.com",
     "commercial bank": "careers@combank.net",
     "sampath": "careers@sampath.lk",
     "seylan": "careers@seylan.lk",
-    "nations trust": "careers@ntb.lk",
     "hatton national": "careers@hnb.lk",
     "hnb": "careers@hnb.lk",
-    "ceylinco": "careers@ceylinco.vip",
-    "hayleys": "careers@advantis.hayleys.com",
 }
 
 
@@ -170,10 +164,11 @@ def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "
     if extracted:
         return extracted
 
-    # Tier 2: Check Master Sri Lanka IT Directory
+    # Tier 2: Check Master Sri Lanka IT Directory with strict SMTP pre-verification
     from_dir = derive_company_email(company, apply_url)
     if from_dir:
-        return from_dir
+        if verify_email_recipient_exists(from_dir):
+            return from_dir
 
     # Tier 3: Infer clean company domain and test standard recruiter inboxes
     if company:
