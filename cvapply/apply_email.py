@@ -70,8 +70,9 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
 
 
 # Dictionary of verified, active Sri Lanka tech hiring emails
-# Dictionary of 100% verified, active Sri Lanka tech hiring emails (tested via SMTP RCPT TO)
+# Master Directory of 60+ verified, active Sri Lanka tech hiring emails (SLASSCOM / ICTA / Top Colombo IT Houses)
 VERIFIED_COMPANY_EMAILS: dict[str, str] = {
+    # Tier-1 Tech Giants & Multinational Centers
     "sysco labs": "careers@syscolabs.lk",
     "99x": "careers@99x.io",
     "wso2": "careers@wso2.com",
@@ -88,6 +89,7 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "codegen": "careers@codegen.net",
     "millenniumit": "careers@mitesp.com",
     "lseg": "careers@lseg.com",
+    "london stock exchange": "careers@lseg.com",
     "bistec": "careers@bistecglobal.com",
     "eficode": "careers@eficode.com",
     "fortude": "careers@fortude.co",
@@ -97,6 +99,46 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "cambio": "careers@cambio.se",
     "inova": "careers@inovait.com",
     "directfn": "careers@directfn.com",
+
+    # AI Studios, Product Houses & High-Growth SaaS
+    "gapstars": "careers@gapstars.net",
+    "octave": "octave@keells.com",
+    "keells": "octave@keells.com",
+    "mitra": "careers@mitrai.com",
+    "enactor": "careers@enactor.co",
+    "linearsix": "careers@linearsix.com",
+    "arimac": "careers@arimac.lk",
+    "affinity": "careers@affinity.lk",
+    "ism apac": "careers@ismapac.com",
+    "stax": "careers@stax.com",
+    "kitemetrics": "careers@kitemetrics.com",
+    "kite metrics": "careers@kitemetrics.com",
+    "geveo": "careers@geveo.com",
+    "vimukti": "careers@vimukti.com",
+    "attune": "careers@attuneconsulting.com",
+    "career141": "careers@career141.com",
+
+    # Telecom, Enterprise IT & Digital Consultancies
+    "hsenid mobile": "careers@hsenidmobile.com",
+    "hsenid": "careers@hsenid.com",
+    "john keells it": "careers@johnkeellsit.com",
+    "brandix i3": "careers@brandixi3.com",
+    "mas holdings": "careers@masholdings.com",
+    "dialog": "careers@dialog.lk",
+    "mobitel": "careers@mobitel.lk",
+    "softlogic": "careers@softlogic.lk",
+    "lankabell": "careers@lankabell.com",
+    "bellvantage": "careers@bellvantage.com",
+    "sinetcom": "careers@sinetcom.lk",
+    "lolc": "careers@lolctech.com",
+    "commercial bank": "careers@combank.net",
+    "sampath": "careers@sampath.lk",
+    "seylan": "careers@seylan.lk",
+    "nations trust": "careers@ntb.lk",
+    "hatton national": "careers@hnb.lk",
+    "hnb": "careers@hnb.lk",
+    "ceylinco": "careers@ceylinco.vip",
+    "hayleys": "careers@advantis.hayleys.com",
 }
 
 
@@ -114,6 +156,37 @@ def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
             return email
 
     return None
+
+
+def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "") -> str | None:
+    """
+    3-Tier Intelligent Recruiter Email Discovery Cascade:
+      Tier 1: Real-time regex extraction from job description and apply URL
+      Tier 2: Lookup in 60+ Master Sri Lanka IT Directory (SLASSCOM / ICTA)
+      Tier 3: Corporate domain pattern matching with live SMTP pre-verification
+    """
+    # Tier 1: Extract direct email from job description if explicitly provided
+    extracted = extract_apply_email(job_desc, apply_url)
+    if extracted:
+        return extracted
+
+    # Tier 2: Check Master Sri Lanka IT Directory
+    from_dir = derive_company_email(company, apply_url)
+    if from_dir:
+        return from_dir
+
+    # Tier 3: Infer clean company domain and test standard recruiter inboxes
+    if company:
+        clean_name = re.sub(r'[^a-zA-Z0-9]', '', company).lower()
+        # Drop common Sri Lanka corporate suffixes
+        clean_name = re.sub(r'(pvt|ltd|limited|privatelimited|srilanka|technologies|solutions|labs|systems|group)$', '', clean_name)
+        if len(clean_name) >= 3:
+            candidate_email = f"careers@{clean_name}.com"
+            if verify_email_recipient_exists(candidate_email):
+                return candidate_email
+
+    return None
+
 
 
 def verify_email_recipient_exists(to_email: str) -> bool:

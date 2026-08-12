@@ -12,7 +12,7 @@ try:
 except Exception:
     pass
 
-from .apply_email import derive_company_email, extract_apply_email, send_application_email
+from .apply_email import derive_company_email, extract_apply_email, resolve_recruiter_email, send_application_email
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
 from .atss.xpressjobs import XpressJobsHandler
@@ -121,10 +121,12 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
         job_id = job.get("_id")
 
         # ── Stage 1: EMAIL APPLICATION (PRIMARY CHANNEL — always attempted) ──
-        # Check verified directory first for 100% bounce protection, then extract from description
-        email_target = derive_company_email(company, job.get("apply_url", ""))
-        if not email_target and settings.email_enabled:
-            email_target = extract_apply_email(job.get("description", ""), job.get("apply_url", ""))
+        # 3-Tier Cascade: (1) Scan JD for email → (2) Master 60+ LK IT Directory → (3) Domain inference + SMTP
+        email_target = resolve_recruiter_email(
+            company,
+            job.get("description", ""),
+            job.get("apply_url", ""),
+        )
 
         if email_target:
 

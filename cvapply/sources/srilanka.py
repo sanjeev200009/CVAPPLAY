@@ -17,12 +17,14 @@ from .base import Job, JobSource
 
 LK_LOCATION = "Colombo, Sri Lanka"
 
-# Strict software/developer/IT keywords matching candidate profile
+# Broad software/developer/IT/AI/product keywords matching candidate profile
 _TECH_KEYWORDS = re.compile(
     r"\b(software|developer|engineer|frontend|front.end|backend|back.end|"
     r"fullstack|full.stack|web|python|react|javascript|typescript|node|api|"
     r"qa|tester|intern|graduate|trainee|cloud|devops|data|ai|ml|it |"
-    r"programmer|coding|junior|associate)\b",
+    r"programmer|coding|junior|associate|product|next.js|nextjs|llm|automation|"
+    r"agent|microservice|docker|kubernetes|linux|flask|fastapi|django|postgresql|"
+    r"sql|database|mobile|android|ios|react native|flutter|chatbot|nlp|generative)\b",
     re.IGNORECASE,
 )
 
@@ -88,6 +90,15 @@ class XpressJobsSource(JobSource):
         {"keywords": "junior developer"},
         {"keywords": "trainee software engineer"},
         {"keywords": "associate software engineer"},
+        {"keywords": "next.js developer"},
+        {"keywords": "AI engineer"},
+        {"keywords": "product engineer"},
+        {"keywords": "node.js developer"},
+        {"keywords": "fastapi"},
+        {"keywords": "automation engineer"},
+        {"keywords": "data engineer"},
+        {"keywords": "cloud engineer"},
+        {"keywords": "associate product engineer"},
         {"SectorId": 30},  # IT-SWare / Internet
         {"SectorId": 142}, # Startup / Tech-startup
         {"SectorId": 145}, # Work From Home / Hybrid
@@ -333,31 +344,55 @@ class SriLankaDirectITCompanySource(JobSource):
     name = "srilanka_direct_it"
 
     COMPANIES = [
-        {"company": "Sysco LABS Sri Lanka", "email": "careers@syscolabs.lk", "url": "https://syscolabs.lk/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Quality Assurance Engineer"]},
-        {"company": "99x", "email": "careers@99x.io", "url": "https://99x.io/careers", "roles": ["Trainee Software Engineer", "Associate Software Engineer", "Frontend Developer (React)"]},
-        {"company": "WSO2", "email": "careers@wso2.com", "url": "https://wso2.com/careers", "roles": ["Associate Software Engineer", "Cloud Engineer", "Integration Developer"]},
-        {"company": "Rootcode Labs", "email": "careers@rootcode.ai", "url": "https://rootcode.ai/careers", "roles": ["Associate Software Engineer", "Junior Fullstack Developer", "AI Developer Trainee"]},
-        {"company": "Surge Global", "email": "careers@surge.global", "url": "https://surge.global/careers", "roles": ["Associate Web Developer", "Junior Python Developer", "React Developer"]},
-        {"company": "Calcey Technologies", "email": "careers@calcey.com", "url": "https://calcey.com/careers", "roles": ["Associate Software Engineer", "Python Developer", "React Developer"]},
-        {"company": "Creative Software", "email": "careers@creativesoftware.com", "url": "https://creativesoftware.com/careers", "roles": ["Associate Software Engineer", "Web Developer", "QA Engineer"]},
-        {"company": "Ascentic", "email": "careers@ascentic.lk", "url": "https://ascentic.lk/careers", "roles": ["Junior Fullstack Engineer", "Associate React Developer", "Node.js Developer"]},
+        # ─── Tier-1 Tech Giants & MNC Centers ───
+        {"company": "Sysco LABS Sri Lanka", "email": "careers@syscolabs.lk", "url": "https://syscolabs.lk/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Quality Assurance Engineer", "Junior DevOps Engineer"]},
+        {"company": "99x", "email": "careers@99x.io", "url": "https://99x.io/careers", "roles": ["Trainee Software Engineer", "Associate Software Engineer", "Frontend Developer (React)", "Associate Product Engineer"]},
+        {"company": "WSO2", "email": "careers@wso2.com", "url": "https://wso2.com/careers", "roles": ["Associate Software Engineer", "Cloud Engineer", "Integration Developer", "Associate AI Engineer"]},
+        {"company": "Rootcode Labs", "email": "careers@rootcode.ai", "url": "https://rootcode.ai/careers", "roles": ["Associate Software Engineer", "Junior Fullstack Developer", "AI Developer Trainee", "Junior LLM Engineer"]},
+        {"company": "Surge Global", "email": "careers@surge.global", "url": "https://surge.global/careers", "roles": ["Associate Web Developer", "Junior Python Developer", "React Developer", "Next.js Developer"]},
+        {"company": "Calcey Technologies", "email": "careers@calcey.com", "url": "https://calcey.com/careers", "roles": ["Associate Software Engineer", "Python Developer", "React Developer", "Junior AI Engineer"]},
+        {"company": "Creative Software", "email": "careers@creativesoftware.com", "url": "https://creativesoftware.com/careers", "roles": ["Associate Software Engineer", "Web Developer", "QA Engineer", "Node.js Developer"]},
+        {"company": "Ascentic", "email": "careers@ascentic.lk", "url": "https://ascentic.lk/careers", "roles": ["Junior Fullstack Engineer", "Associate React Developer", "Node.js Developer", "Backend Python Developer"]},
         {"company": "Zone24x7", "email": "careers@zone24x7.com", "url": "https://zone24x7.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer", "QA Engineer"]},
-        {"company": "Virtusa Sri Lanka", "email": "careers@virtusa.com", "url": "https://virtusa.com/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Cloud Support Engineer"]},
-        {"company": "IFS Sri Lanka", "email": "careers@ifs.com", "url": "https://ifs.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer"]},
-        {"company": "Axienta", "email": "careers@axienta.com", "url": "https://axienta.com/careers", "roles": ["Associate Software Engineer", "Mobile / Web Developer"]},
-        {"company": "Pearson Lanka", "email": "careers@pearson.com", "url": "https://pearson.com/careers", "roles": ["Associate Software Engineer", "EdTech Web Developer"]},
-        {"company": "CodeGen International", "email": "careers@codegen.net", "url": "https://codegen.net/careers", "roles": ["Associate Software Engineer", "Software Engineer", "AI/ML Trainee"]},
-        {"company": "MillenniumIT ESP", "email": "careers@mitesp.com", "url": "https://mitesp.com/careers", "roles": ["Associate Software Engineer", "IT Support Engineer", "DevOps Trainee"]},
-        {"company": "LSEG Sri Lanka (London Stock Exchange Group)", "email": "careers@lseg.com", "url": "https://lseg.com/careers", "roles": ["Associate Software Engineer", "Data Analyst", "Systems Engineer"]},
-        {"company": "BISTEC Global", "email": "careers@bistecglobal.com", "url": "https://bistecglobal.com/careers", "roles": ["Associate Software Engineer", "React / Node.js Developer"]},
-        {"company": "Eficode Sri Lanka", "email": "careers@eficode.com", "url": "https://eficode.com/careers", "roles": ["Associate DevOps Engineer", "Trainee Software Engineer"]},
-        {"company": "Fortude", "email": "careers@fortude.co", "url": "https://fortude.co/careers", "roles": ["Associate Software Engineer", "BI / Data Developer"]},
-        {"company": "TIQRI", "email": "careers@tiqri.com", "url": "https://tiqri.com/careers", "roles": ["Associate Software Engineer", "Web Developer"]},
-        {"company": "SimCentric Technologies", "email": "careers@simcentric.com", "url": "https://simcentric.com/careers", "roles": ["Software Engineer", "C++ / Python Developer"]},
-        {"company": "Aeturnum", "email": "careers@aeturnum.com", "url": "https://aeturnum.com/careers", "roles": ["Associate Software Engineer", "Fullstack Developer"]},
-        {"company": "Cambio Software Engineering", "email": "careers@cambio.se", "url": "https://cambio.se/careers", "roles": ["Associate Software Engineer", "Java / Python Developer"]},
-        {"company": "Inova IT Systems", "email": "careers@inovait.com", "url": "https://inovait.com/careers", "roles": ["Junior Web Developer", "Associate Software Engineer"]},
-        {"company": "DirectFN Sri Lanka", "email": "careers@directfn.com", "url": "https://directfn.com/careers", "roles": ["Associate Software Engineer", "FinTech Developer"]},
+        {"company": "Virtusa Sri Lanka", "email": "careers@virtusa.com", "url": "https://virtusa.com/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Cloud Support Engineer", "Junior Data Engineer"]},
+        {"company": "IFS Sri Lanka", "email": "careers@ifs.com", "url": "https://ifs.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer", "Cloud Associate Engineer"]},
+        {"company": "Axienta", "email": "careers@axienta.com", "url": "https://axienta.com/careers", "roles": ["Associate Software Engineer", "Mobile / Web Developer", "Associate React Native Developer"]},
+        {"company": "Pearson Lanka", "email": "careers@pearson.com", "url": "https://pearson.com/careers", "roles": ["Associate Software Engineer", "EdTech Web Developer", "Junior Next.js Engineer"]},
+        {"company": "CodeGen International", "email": "careers@codegen.net", "url": "https://codegen.net/careers", "roles": ["Associate Software Engineer", "Software Engineer", "AI/ML Trainee", "Junior Python Engineer"]},
+        {"company": "MillenniumIT ESP", "email": "careers@mitesp.com", "url": "https://mitesp.com/careers", "roles": ["Associate Software Engineer", "IT Support Engineer", "DevOps Trainee", "Junior Full-Stack Developer"]},
+        {"company": "LSEG Sri Lanka", "email": "careers@lseg.com", "url": "https://lseg.com/careers", "roles": ["Associate Software Engineer", "Data Analyst", "Systems Engineer", "Junior Python Developer"]},
+        {"company": "BISTEC Global", "email": "careers@bistecglobal.com", "url": "https://bistecglobal.com/careers", "roles": ["Associate Software Engineer", "React / Node.js Developer", "Junior Full-Stack Engineer"]},
+        {"company": "Eficode Sri Lanka", "email": "careers@eficode.com", "url": "https://eficode.com/careers", "roles": ["Associate DevOps Engineer", "Trainee Software Engineer", "Cloud & Automation Engineer"]},
+        {"company": "Fortude", "email": "careers@fortude.co", "url": "https://fortude.co/careers", "roles": ["Associate Software Engineer", "BI / Data Developer", "Junior API Engineer"]},
+        {"company": "TIQRI", "email": "careers@tiqri.com", "url": "https://tiqri.com/careers", "roles": ["Associate Software Engineer", "Web Developer", "React.js Developer"]},
+        {"company": "SimCentric Technologies", "email": "careers@simcentric.com", "url": "https://simcentric.com/careers", "roles": ["Software Engineer", "Python Developer", "Junior Simulation Engineer"]},
+        {"company": "Aeturnum", "email": "careers@aeturnum.com", "url": "https://aeturnum.com/careers", "roles": ["Associate Software Engineer", "Fullstack Developer", "Junior React Engineer"]},
+        {"company": "Cambio Software Engineering", "email": "careers@cambio.se", "url": "https://cambio.se/careers", "roles": ["Associate Software Engineer", "Java / Python Developer", "Cloud Engineer"]},
+        {"company": "Inova IT Systems", "email": "careers@inovait.com", "url": "https://inovait.com/careers", "roles": ["Junior Web Developer", "Associate Software Engineer", "Next.js / React Developer"]},
+        {"company": "DirectFN Sri Lanka", "email": "careers@directfn.com", "url": "https://directfn.com/careers", "roles": ["Associate Software Engineer", "FinTech Developer", "Junior Python Developer"]},
+
+        # ─── AI Studios, Product Houses & High-Growth SaaS ───
+        {"company": "Gapstars", "email": "careers@gapstars.net", "url": "https://gapstars.net/careers", "roles": ["Associate Software Engineer", "Junior Full-Stack Developer", "Associate Product Engineer"]},
+        {"company": "Octave (John Keells AI Studio)", "email": "octave@keells.com", "url": "https://johnkeells.com/octave", "roles": ["Associate AI Engineer", "Junior Data Scientist", "AI/ML Trainee Engineer"]},
+        {"company": "Mitra Innovation", "email": "careers@mitrai.com", "url": "https://mitrai.com/careers", "roles": ["Associate Software Engineer", "Junior AI Developer", "Full-Stack Developer", "Associate Product Engineer"]},
+        {"company": "Enactor", "email": "careers@enactor.co", "url": "https://enactor.co/careers", "roles": ["Associate Software Engineer", "Junior Java / React Developer", "Trainee Software Engineer"]},
+        {"company": "LinearSix", "email": "careers@linearsix.com", "url": "https://linearsix.com/careers", "roles": ["Associate FinTech Engineer", "Junior Python / Node.js Developer", "Frontend React Developer"]},
+        {"company": "Arimac", "email": "careers@arimac.lk", "url": "https://arimac.lk/careers", "roles": ["Associate Software Engineer", "Junior Mobile Developer", "React Native / Flutter Developer"]},
+        {"company": "Affinity Global", "email": "careers@affinity.lk", "url": "https://affinity.lk/careers", "roles": ["Associate Software Engineer", "Junior Full-Stack Developer", "Node.js / React Developer"]},
+        {"company": "ISM APAC", "email": "careers@ismapac.com", "url": "https://ismapac.com/careers", "roles": ["Associate Software Engineer", "Trainee Developer", "QA / Automation Trainee"]},
+        {"company": "Stax", "email": "careers@stax.com", "url": "https://stax.com/careers", "roles": ["Associate Cloud Engineer", "Junior DevOps Engineer", "Backend Python Developer"]},
+        {"company": "Geveo Australasia", "email": "careers@geveo.com", "url": "https://geveo.com/careers", "roles": ["Associate Software Engineer", "Junior Full-Stack Developer", "QA Engineer"]},
+        {"company": "Vimukti Technologies", "email": "careers@vimukti.com", "url": "https://vimukti.com/careers", "roles": ["Associate Software Engineer", "Junior Web Developer", "Python / Django Developer"]},
+        {"company": "Attune", "email": "careers@attuneconsulting.com", "url": "https://attuneconsulting.com/careers", "roles": ["Associate Software Engineer", "Junior React Developer", "Cloud Support Trainee"]},
+
+        # ─── Telecom, Enterprise IT & Digital Consultancies ───
+        {"company": "hSenid Software", "email": "careers@hsenid.com", "url": "https://hsenid.com/careers", "roles": ["Associate Software Engineer", "Junior Mobile Developer", "Trainee Software Engineer"]},
+        {"company": "hSenid Mobile Solutions", "email": "careers@hsenidmobile.com", "url": "https://hsenidmobile.com/careers", "roles": ["Associate Software Engineer", "Junior API Developer", "Telecom Software Trainee"]},
+        {"company": "John Keells IT", "email": "careers@johnkeellsit.com", "url": "https://johnkeellsit.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Developer", "IT Graduate Trainee"]},
+        {"company": "Dialog Enterprise", "email": "careers@dialog.lk", "url": "https://dialog.lk/careers", "roles": ["Junior Software Engineer", "Associate Cloud Engineer", "API Developer"]},
+        {"company": "Softlogic IT", "email": "careers@softlogic.lk", "url": "https://softlogic.lk/careers", "roles": ["Associate Software Engineer", "Junior Full-Stack Developer", "IT Graduate"]},
+        {"company": "BellVantage", "email": "careers@bellvantage.com", "url": "https://bellvantage.com/careers", "roles": ["Associate Software Engineer", "Junior Web Developer", "Python Developer Trainee"]},
+        {"company": "LOLC Tech", "email": "careers@lolctech.com", "url": "https://lolctech.com/careers", "roles": ["Associate Software Engineer", "Junior Web Developer", "FinTech Trainee"]},
     ]
 
 

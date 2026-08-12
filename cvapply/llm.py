@@ -216,13 +216,23 @@ personalized job application email body (2 to 3 paragraphs, 150-200 words) from 
 
 CANDIDATE PROFILE:
 - Full Name: Sivasuthakaran Sanjeev
+- Current Role: Associate Product & AI Engineer at Career141 (Global Executive Search Platform, Colombo, Sri Lanka)
 - Location: Colombo, Sri Lanka (available for fully remote roles worldwide)
 - Email: sanjaysanjeev2000@gmail.com
 - Phone: +94 753 883 167
 - Portfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/
 - GitHub: https://github.com/sanjeev200009
-- Experience: Under 1 year (fresh/junior developer)
-- Core Skills: Python, FastAPI, React.js, Next.js, JavaScript, TypeScript, Node.js, PostgreSQL, REST APIs, WebSockets, Git, Docker basics, Linux
+- Education: BIT (Hons) in Networking & Mobile Computing, Horizon Campus
+- Experience: Under 1 year (fresh/junior — recently promoted from Web Developer Intern to Associate Product & AI Engineer)
+
+KEY PRODUCTION ACHIEVEMENTS AT CAREER141 (HIGHLIGHT 1-2 OF THESE):
+- Built and owns an autonomous 13-stage AI recruitment pipeline processing 115,000+ candidate profiles
+- Engineered a custom email automation platform that cut email delivery costs by 78%
+- Rebuilt the Career141 Next.js 15 website from scratch (production, live)
+- Integrated WhatsApp Business API automation workflows for recruiter communications
+- Delivered LLM-powered AI workflows using Python, FastAPI, and cloud infrastructure (AWS, Cloudflare, Supabase, Convex)
+
+CORE SKILLS: Python, FastAPI, React.js, Next.js 15, JavaScript, TypeScript, Node.js, PostgreSQL, REST APIs, WebSockets, Git, Docker, Linux, AWS, Cloudflare, Supabase, Convex, LLM integrations
 
 RULES:
 1. Write 2 to 3 body paragraphs explaining how the candidate's technical skills match the job description.
@@ -232,7 +242,9 @@ RULES:
 5. DO NOT invent skills, fake projects, or false experience.
 6. DO NOT mention salary, expected compensation, or notice period anywhere.
 7. Include a note that CV/resume is attached to this email.
-8. Output ONLY the 2-3 body paragraphs. DO NOT output any reasoning, thinking process, greetings, headers, subject lines, or sign-offs."""
+8. When applying to AI/Product/Full-Stack roles: prominently mention the Career141 13-stage AI pipeline and LLM experience.
+9. When applying to Frontend/React roles: highlight Next.js 15 website rebuild and React production experience.
+10. Output ONLY the 2-3 body paragraphs. DO NOT output any reasoning, thinking process, greetings, headers, subject lines, or sign-offs."""
 
             user = (
                 f"COMPANY: {company}\n"
