@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.convex/
+convex/_generated/
+screenshots/
+.cache/
+logs/
+scratch/
+*.log
+*.pdf
