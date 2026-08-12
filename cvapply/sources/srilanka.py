@@ -342,23 +342,24 @@ class SriLankaDirectITCompanySource(JobSource):
         {"company": "Creative Software", "email": "careers@creativesoftware.com", "url": "https://creativesoftware.com/careers", "roles": ["Associate Software Engineer", "Web Developer", "QA Engineer"]},
         {"company": "Ascentic", "email": "careers@ascentic.lk", "url": "https://ascentic.lk/careers", "roles": ["Junior Fullstack Engineer", "Associate React Developer", "Node.js Developer"]},
         {"company": "Zone24x7", "email": "careers@zone24x7.com", "url": "https://zone24x7.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer", "QA Engineer"]},
-        {"company": "Virtusa Sri Lanka", "email": "careers.lk@virtusa.com", "url": "https://virtusa.com/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Cloud Support Engineer"]},
-        {"company": "IFS Sri Lanka", "email": "careers.lk@ifs.com", "url": "https://ifs.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer"]},
+        {"company": "Virtusa Sri Lanka", "email": "careers@virtusa.com", "url": "https://virtusa.com/careers", "roles": ["Associate Software Engineer", "Trainee Software Engineer", "Cloud Support Engineer"]},
+        {"company": "IFS Sri Lanka", "email": "careers@ifs.com", "url": "https://ifs.com/careers", "roles": ["Associate Software Engineer", "Junior Systems Engineer"]},
         {"company": "Axienta", "email": "careers@axienta.com", "url": "https://axienta.com/careers", "roles": ["Associate Software Engineer", "Mobile / Web Developer"]},
-        {"company": "Pearson Lanka", "email": "careers.lanka@pearson.com", "url": "https://pearson.com/careers", "roles": ["Associate Software Engineer", "EdTech Web Developer"]},
+        {"company": "Pearson Lanka", "email": "careers@pearson.com", "url": "https://pearson.com/careers", "roles": ["Associate Software Engineer", "EdTech Web Developer"]},
         {"company": "CodeGen International", "email": "careers@codegen.net", "url": "https://codegen.net/careers", "roles": ["Associate Software Engineer", "Software Engineer", "AI/ML Trainee"]},
         {"company": "MillenniumIT ESP", "email": "careers@mitesp.com", "url": "https://mitesp.com/careers", "roles": ["Associate Software Engineer", "IT Support Engineer", "DevOps Trainee"]},
-        {"company": "LSEG Sri Lanka (London Stock Exchange Group)", "email": "careers.lk@lseg.com", "url": "https://lseg.com/careers", "roles": ["Associate Software Engineer", "Data Analyst", "Systems Engineer"]},
+        {"company": "LSEG Sri Lanka (London Stock Exchange Group)", "email": "careers@lseg.com", "url": "https://lseg.com/careers", "roles": ["Associate Software Engineer", "Data Analyst", "Systems Engineer"]},
         {"company": "BISTEC Global", "email": "careers@bistecglobal.com", "url": "https://bistecglobal.com/careers", "roles": ["Associate Software Engineer", "React / Node.js Developer"]},
-        {"company": "Eficode Sri Lanka", "email": "careers.lk@eficode.com", "url": "https://eficode.com/careers", "roles": ["Associate DevOps Engineer", "Trainee Software Engineer"]},
+        {"company": "Eficode Sri Lanka", "email": "careers@eficode.com", "url": "https://eficode.com/careers", "roles": ["Associate DevOps Engineer", "Trainee Software Engineer"]},
         {"company": "Fortude", "email": "careers@fortude.co", "url": "https://fortude.co/careers", "roles": ["Associate Software Engineer", "BI / Data Developer"]},
         {"company": "TIQRI", "email": "careers@tiqri.com", "url": "https://tiqri.com/careers", "roles": ["Associate Software Engineer", "Web Developer"]},
         {"company": "SimCentric Technologies", "email": "careers@simcentric.com", "url": "https://simcentric.com/careers", "roles": ["Software Engineer", "C++ / Python Developer"]},
         {"company": "Aeturnum", "email": "careers@aeturnum.com", "url": "https://aeturnum.com/careers", "roles": ["Associate Software Engineer", "Fullstack Developer"]},
-        {"company": "Cambio Software Engineering", "email": "careers.lk@cambio.se", "url": "https://cambio.se/careers", "roles": ["Associate Software Engineer", "Java / Python Developer"]},
+        {"company": "Cambio Software Engineering", "email": "careers@cambio.se", "url": "https://cambio.se/careers", "roles": ["Associate Software Engineer", "Java / Python Developer"]},
         {"company": "Inova IT Systems", "email": "careers@inovait.com", "url": "https://inovait.com/careers", "roles": ["Junior Web Developer", "Associate Software Engineer"]},
-        {"company": "DirectFN Sri Lanka", "email": "careers.lk@directfn.com", "url": "https://directfn.com/careers", "roles": ["Associate Software Engineer", "FinTech Developer"]},
+        {"company": "DirectFN Sri Lanka", "email": "careers@directfn.com", "url": "https://directfn.com/careers", "roles": ["Associate Software Engineer", "FinTech Developer"]},
     ]
+
 
     def fetch(self) -> list[Job]:
         jobs: list[Job] = []
