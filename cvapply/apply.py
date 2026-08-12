@@ -43,7 +43,8 @@ def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
     candidates = [
         j
         for j in jobs
-        if j.get("status") == "scored"
+        if j.get("status") == "scored"               # only ready jobs
+        and j.get("status") != "ats_only"            # never re-attempt ATS portal-only companies via email
         and (j.get("match_score") or 0) >= settings.match_threshold
     ]
     # Prioritize Sri Lanka location tier first, then highest match score
