@@ -37,13 +37,12 @@ Output JSON ONLY:
 
 class OpenRouterClient:
     def __init__(self) -> None:
-        self.api_key = settings.openrouter_api_key
-        if not self.api_key:
-            raise RuntimeError("OPENROUTER_API_KEY not set")
+        self.api_key = settings.openrouter_api_key or ""
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
 
     def _call_nvidia_nim(self, system: str, user: str, max_tokens: int = 700) -> str | None:
         if not settings.nvidia_api_key:
@@ -68,12 +67,10 @@ class OpenRouterClient:
                 resp = requests.post(url, headers=headers, json=payload, timeout=90)
                 resp.raise_for_status()
                 content = resp.json()["choices"][0]["message"]["content"] or ""
-                # Clean thinking process preamble and instruction echo if output by reasoning models
-                subj_match = re.search(r'(Subject:\s*Application for.*)', content, re.IGNORECASE | re.DOTALL)
-                if subj_match:
-                    content = subj_match.group(1).strip()
-                elif "Dear " in content:
-                    content = content[content.find("Dear "):].strip()
+                # Clean thinking process preamble by finding the LAST occurrence of "Dear " for email bodies
+                dear_idx = content.rfind("Dear ")
+                if dear_idx != -1:
+                    content = content[dear_idx:].strip()
                 elif "{" in content and "}" in content:
                     m = re.search(r"\{.*\}", content, re.DOTALL)
                     if m:
@@ -85,6 +82,7 @@ class OpenRouterClient:
                     content = content[:gh_match.end()].strip()
 
                 return content
+
 
 
             except Exception as exc:
@@ -187,25 +185,26 @@ class OpenRouterClient:
         job_title: str,
         job_desc: str,
         cv_text: str,
-        match_reason: str = "",
+        match_reason: str = "Matching candidate technical skills",
     ) -> dict[str, str]:
-        subject = f"Application for {job_title} — Sivasuthakaran Sanjeev"
+        """Generates a highly personalized, professional application email."""
+        subject = f"Application for {job_title} — {settings.candidate_first_name} {settings.candidate_last_name}"
         fallback_body = f"""Dear Hiring Manager at {company},
 
-I am writing to express my strong interest in the {job_title} position at {company}. As a Junior Software Engineer based in Colombo, Sri Lanka, with practical experience building modern web applications using Python, React, JavaScript, Node.js, and REST APIs, I am excited about the opportunity to contribute to your engineering team.
+I am writing to express my enthusiastic interest in the {job_title} position at {company}. As a Junior Software Engineer with practical experience building modern web applications and AI workflows, I am eager to contribute to {company}'s engineering projects.
 
-Key highlights of my qualifications include:
-- Hands-on development experience building scalable backend APIs with Python (FastAPI/Flask) and Node.js.
-- Frontend web development skills in React.js, Next.js, HTML5/CSS3, and responsive UI design.
-- Proficiency in relational databases (PostgreSQL), Git version control, WebSockets, and Linux environments.
+My technical background directly aligns with your requirements:
+- Full-Stack Web Development: Hands-on experience building scalable applications using Python (FastAPI/Flask), React.js, Next.js, and TypeScript.
+- Backend & REST APIs: Skilled in designing clean RESTful APIs, WebSockets integration, and database management with PostgreSQL and SQL.
+- Engineering Fundamentals: Proficient with Git version control, Docker containers, and Linux environments.
 
-My complete CV/resume is attached to this email. You can also view my live portfolio at https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/ and my GitHub at https://github.com/sanjeev200009.
+My complete resume is attached to this email. You can also view my live portfolio at https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/ and GitHub at https://github.com/sanjeev200009.
 
-Thank you for your time and consideration. I look forward to the opportunity to discuss how my technical skills align with {company}'s goals.
+Thank you for your time and consideration. I look forward to discussing how my technical background aligns with {company}'s goals.
 
 Sincerely,
-Sivasuthakaran Sanjeev
-Email: sanjaysanjeev2000@gmail.com
+{settings.candidate_first_name} {settings.candidate_last_name}
+Email: {settings.email_user}
 Phone: +94 753 883 167
 Portfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/
 GitHub: https://github.com/sanjeev200009
@@ -226,7 +225,7 @@ CANDIDATE PROFILE:
 - Core Skills: Python, FastAPI, React.js, Next.js, JavaScript, TypeScript, Node.js, PostgreSQL, REST APIs, WebSockets, Git, Docker basics, Linux
 
 RULES:
-1. Write a COMPLETE email - subject line on the first line as "Subject: [subject]", then a blank line, then the full body.
+1. Output ONLY the email body starting directly with "Dear Hiring Manager at [Company Name],".
 2. The email MUST be personalized to the SPECIFIC COMPANY NAME and SPECIFIC JOB TITLE.
 3. Identify 3-5 specific requirements from the job description that match the candidate's real skills.
 4. Use a professional but warm tone. Not robotic. Not generic.
@@ -235,12 +234,7 @@ RULES:
 7. DO NOT invent skills, fake projects, or false experience.
 8. DO NOT mention salary, expected compensation, or notice period anywhere in the email.
 9. Always attach a note that CV/resume is attached to this email.
-
-OUTPUT FORMAT (exactly):
-Subject: [your subject line]
-
-[full email body starting with Dear...]"""
-
+10. DO NOT output any thinking, reasoning, subject lines, headers, or notes."""
 
             user = (
                 f"COMPANY: {company}\n"
@@ -253,30 +247,16 @@ Subject: [your subject line]
                 settings.cover_letter_model, system, user, max_tokens=800, json_mode=False
             ).strip()
 
-            # Clean out any thinking preamble if present
-            if "Dear " in raw:
-                dear_idx = raw.find("Dear ")
+            dear_idx = raw.rfind("Dear ")
+            if dear_idx != -1:
                 body_candidate = raw[dear_idx:].strip()
-                # Check for Subject before Dear
-                header_part = raw[:dear_idx]
-                for line in header_part.splitlines():
-                    if line.lower().startswith("subject:"):
-                        subject = line[8:].strip()
-                        break
-                if body_candidate:
+                gh_match = re.search(r'(https://github\.com/[^\s\n]+)', body_candidate)
+                if gh_match:
+                    body_candidate = body_candidate[:gh_match.end()].strip()
+                if body_candidate and len(body_candidate) > 100:
                     return {"subject": subject, "body": body_candidate}
 
-            lines = raw.splitlines()
-            body_lines = lines
-            for i, line in enumerate(lines):
-                if line.lower().startswith("subject:"):
-                    subject = line[8:].strip()
-                    body_lines = lines[i + 1:]
-                    break
 
-            body = "\n".join(body_lines).strip()
-            if body and len(body) > 100:
-                return {"subject": subject, "body": body}
         except Exception as exc:
             print(f"  ⚠️ LLM call fallback for email application: {exc}")
 
