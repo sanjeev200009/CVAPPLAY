@@ -58,7 +58,8 @@ class Settings:
     scoring_model: str = "google/gemini-2.5-flash"
     cover_letter_model: str = "openai/gpt-4o-mini"
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    nvidia_model: str = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
+    nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
+
 
     cv_pdf_path: str = os.getenv("CV_PDF_PATH", r"C:\Users\user\Downloads\sanjeevcv.pdf (6) (1).pdf")
     cv_version_label: str = "v2"
