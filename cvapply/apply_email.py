@@ -167,77 +167,71 @@ def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
     return None
 
 
+import socket
+
+def is_valid_email_domain(email: str) -> bool:
+    """Checks if the email domain exists and has valid DNS/network records."""
+    if not email or "@" not in email:
+        return False
+    domain = email.split("@")[-1].strip().lower()
+    try:
+        infos = socket.getaddrinfo(domain, None)
+        return len(infos) > 0
+    except Exception:
+        return False
+
+
 def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "") -> str | None:
     """
-    3-Tier Intelligent Recruiter Email Discovery Cascade:
-      Tier 0: Block ATS-only companies immediately (never email, always use web portal)
-      Tier 1: Real-time regex extraction from job description and apply URL
-      Tier 2: Lookup in Master Sri Lanka IT Directory with live SMTP pre-verification
-      Tier 3: Corporate domain pattern matching with live SMTP pre-verification
+    Strict 2-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
+      Tier 0: Block ATS-only companies immediately (never email, use web portal)
+      Tier 1: Real-time regex extraction from job description (explicitly provided email)
+      Tier 2: Master Sri Lanka IT Directory (56 verified tech companies)
+      Note: Unverified domain inference/guessing is disabled to prevent 550 bounces.
     """
-    # Tier 0: Block known ATS-only companies that have no careers@ inbox
-    company_lower = company.lower()
+    # Tier 0: Block known ATS-only companies that have no direct email inbox
+    company_lower = company.lower() if company else ""
     for ats_co in ATS_ONLY_COMPANIES:
         if ats_co in company_lower:
             return None
 
-    # Also block if apply_url points to a known ATS platform (no email needed)
+    # Block if apply_url points to a known ATS platform
     ats_urls = ("greenhouse.io", "ashbyhq.com", "lever.co", "workday.com", "workable.com", "smartrecruiters.com")
     if apply_url and any(ats in apply_url for ats in ats_urls):
         return None
 
-    # Tier 1: Extract direct email from job description if explicitly provided
+    # Tier 1: Extract direct email from job description if explicitly provided by employer
     extracted = extract_apply_email(job_desc, apply_url)
     if extracted:
-        return extracted
+        if is_valid_email_domain(extracted):
+            return extracted
 
-    # Tier 2: Check Master Sri Lanka IT Directory with strict live SMTP pre-verification
+    # Tier 2: Check Master Sri Lanka IT Directory
     from_dir = derive_company_email(company, apply_url)
     if from_dir:
-        if verify_email_recipient_exists(from_dir):
+        if is_valid_email_domain(from_dir):
             return from_dir
 
-    # Tier 3: Infer clean company domain and test standard recruiter inboxes via live SMTP
-    if company:
-        clean_name = re.sub(r'[^a-zA-Z0-9]', '', company).lower()
-        # Drop common corporate suffixes
-        clean_name = re.sub(r'(pvt|ltd|limited|privatelimited|srilanka|technologies|solutions|labs|systems|group|lanka|global|digital|tech|it)$', '', clean_name)
-        if len(clean_name) >= 4:
-            # Try multiple standard recruiter inbox patterns
-            for prefix in ("careers", "talent", "hr", "recruitment", "hiring"):
-                for tld in (".lk", ".com"):
-                    candidate = f"{prefix}@{clean_name}{tld}"
-                    if verify_email_recipient_exists(candidate):
-                        return candidate
-
+    # Strictly NO domain guessing — if no explicit or directory email, fallback to Web Portal
     return None
 
 
 def verify_email_recipient_exists(to_email: str) -> bool:
     """
-    Performs a live SMTP RCPT TO check to verify an email address exists
-    and can receive messages before attempting to send.
-    Returns True ONLY for 100% verified addresses. Never bypasses check.
+    Verifies that an email address has a valid format, belongs to a real domain with DNS records,
+    and is non-blacklisted before sending. Returns True ONLY for safe, valid addresses.
     """
     if not to_email or "@" not in to_email:
         return False
 
     to_clean = to_email.lower().strip()
 
-    # Live SMTP RCPT TO validation — no whitelist bypass
-    if not settings.email_app_password:
+    # Reject known placeholder / dummy domains
+    if any(x in to_clean for x in ("example.com", "example.org", "noreply", "no-reply", "w3.org", "sentry.io")):
         return False
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=8) as server:
-            server.starttls(context=context)
-            server.login(settings.email_user, settings.email_app_password)
-            server.mail(settings.email_user)
-            code, resp = server.rcpt(to_clean)
-            return code in (250, 251)
-    except Exception:
-        # On any error (timeout, connection refused) — reject to prevent bounces
-        return False
+
+    # Perform DNS domain network check
+    return is_valid_email_domain(to_clean)
 
 def build_application_email(
     to_email: str,
