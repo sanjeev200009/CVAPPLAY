@@ -150,12 +150,16 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
 def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
     """
     Returns a verified hiring email address for known Sri Lanka IT companies,
-    or None if no verified email exists (preventing email bounces).
+    or None if no verified email exists or if company is ATS-only (preventing email bounces).
     """
     if not company_name:
         return None
 
     clean = company_name.lower()
+    for ats_co in ATS_ONLY_COMPANIES:
+        if ats_co in clean:
+            return None
+
     for key, email in VERIFIED_COMPANY_EMAILS.items():
         if key in clean:
             return email

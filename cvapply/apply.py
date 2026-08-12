@@ -12,7 +12,7 @@ try:
 except Exception:
     pass
 
-from .apply_email import derive_company_email, extract_apply_email, resolve_recruiter_email, send_application_email
+from .apply_email import derive_company_email, extract_apply_email, resolve_recruiter_email, send_application_email, verify_email_recipient_exists
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
 from .atss.xpressjobs import XpressJobsHandler
@@ -181,7 +181,7 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
         # ── Stage 3: EMAIL FALLBACK (IF WEB PORTAL FAILED & NO EMAIL SENT YET) ──
         if not email_target and not web_submitted and settings.email_enabled:
             fallback_email = derive_company_email(company, job.get("apply_url", ""))
-            if fallback_email:
+            if fallback_email and verify_email_recipient_exists(fallback_email):
 
                 print(f"  📧 Web portal unavailable/failed. Sending fallback application email to {fallback_email}...")
                 try:
