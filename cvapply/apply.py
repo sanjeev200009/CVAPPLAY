@@ -151,11 +151,14 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
                     print(f"  [dry-run] Would email: {email_target}")
                     print(f"  Subject: {subject}")
                     print(f"  Body preview: {body[:200]}...")
+            except ValueError as exc:
+                print(f"  ℹ️  Skipped unverified email ({email_target}) to prevent 550 bounce: {exc}")
             except Exception as exc:
                 _log_application(convex, job_id, "", "failed", str(exc)[:300], {"channel": "email", "to": email_target})
                 msg = _format_telegram_msg("❌", f"EMAIL FAILED ({email_target})", job, score, extra_error=str(exc))
                 telegram.send_message(msg)
                 print(f"  ❌ Email failed: {exc}")
+
         else:
             print(f"  ℹ️  No recruiter email found — will apply via web portal only")
 

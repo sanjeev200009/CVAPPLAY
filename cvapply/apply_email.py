@@ -119,21 +119,32 @@ def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
 def verify_email_recipient_exists(to_email: str) -> bool:
     """
     Performs a live SMTP RCPT TO check via Gmail to verify if an email address exists
-    and can receive messages before attempting to send.
+    and can receive messages before attempting to send. Returns True ONLY for 100% valid addresses.
     """
-    if not settings.email_app_password:
+    if not to_email or "@" not in to_email:
+        return False
+
+    to_clean = to_email.lower().strip()
+    
+    # 1. Always allow our whitelisted, tested Sri Lanka company emails
+    if to_clean in VERIFIED_COMPANY_EMAILS.values():
         return True
+
+    # 2. For all other email addresses, perform live SMTP RCPT TO validation
+    if not settings.email_app_password:
+        return False
     try:
         context = ssl.create_default_context()
-        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=10) as server:
+        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=8) as server:
             server.starttls(context=context)
             server.login(settings.email_user, settings.email_app_password)
             server.mail(settings.email_user)
-            code, resp = server.rcpt(to_email)
+            code, resp = server.rcpt(to_clean)
             return code in (250, 251)
     except Exception:
-        # If verification check times out or network blips, allow send attempt
-        return True
+        # If verification times out, strictly reject unverified email to prevent bounces
+        return False
+
 
 
 def build_application_email(
