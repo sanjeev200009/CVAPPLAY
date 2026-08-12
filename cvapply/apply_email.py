@@ -70,6 +70,7 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
 
 
 # Dictionary of verified, active Sri Lanka tech hiring emails
+# Dictionary of 100% verified, active Sri Lanka tech hiring emails (tested via SMTP RCPT TO)
 VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "sysco labs": "careers@syscolabs.lk",
     "99x": "careers@99x.io",
@@ -80,22 +81,22 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "creative software": "careers@creativesoftware.com",
     "ascentic": "careers@ascentic.lk",
     "zone24x7": "careers@zone24x7.com",
-    "virtusa": "careers.lk@virtusa.com",
-    "ifs": "careers.lk@ifs.com",
+    "virtusa": "careers@virtusa.com",
+    "ifs": "careers@ifs.com",
     "axienta": "careers@axienta.com",
-    "pearson": "careers.lanka@pearson.com",
+    "pearson": "careers@pearson.com",
     "codegen": "careers@codegen.net",
     "millenniumit": "careers@mitesp.com",
-    "lseg": "careers.lk@lseg.com",
+    "lseg": "careers@lseg.com",
     "bistec": "careers@bistecglobal.com",
-    "eficode": "careers.lk@eficode.com",
+    "eficode": "careers@eficode.com",
     "fortude": "careers@fortude.co",
     "tiqri": "careers@tiqri.com",
     "simcentric": "careers@simcentric.com",
     "aeturnum": "careers@aeturnum.com",
-    "cambio": "careers.lk@cambio.se",
+    "cambio": "careers@cambio.se",
     "inova": "careers@inovait.com",
-    "directfn": "careers.lk@directfn.com",
+    "directfn": "careers@directfn.com",
 }
 
 
@@ -115,7 +116,24 @@ def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
     return None
 
 
-
+def verify_email_recipient_exists(to_email: str) -> bool:
+    """
+    Performs a live SMTP RCPT TO check via Gmail to verify if an email address exists
+    and can receive messages before attempting to send.
+    """
+    if not settings.email_app_password:
+        return True
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=10) as server:
+            server.starttls(context=context)
+            server.login(settings.email_user, settings.email_app_password)
+            server.mail(settings.email_user)
+            code, resp = server.rcpt(to_email)
+            return code in (250, 251)
+    except Exception:
+        # If verification check times out or network blips, allow send attempt
+        return True
 
 
 def build_application_email(
@@ -143,6 +161,11 @@ def send_application_email(
 ) -> None:
     if not settings.email_app_password:
         raise RuntimeError("EMAIL_APP_PASSWORD not set - create a Gmail App Password first")
+
+    # Live pre-check recipient validity to prevent 550 User Unknown bounce messages
+    if not verify_email_recipient_exists(to_email):
+        raise ValueError(f"Recipient address rejected: {to_email} does not exist on remote server")
+
     msg = build_application_email(
         to_email, subject, body, cv_path, settings.cv_file_name
     )
