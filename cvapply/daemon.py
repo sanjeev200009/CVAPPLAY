@@ -111,8 +111,8 @@ def main() -> None:
     parser.add_argument(
         "--batch-limit",
         type=int,
-        default=6,
-        help="max applications to submit per cycle (default: 6)",
+        default=100,
+        help="max applications to attempt per cycle (default: 100)",
     )
     args = parser.parse_args()
     start_daemon(
