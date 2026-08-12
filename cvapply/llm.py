@@ -63,7 +63,7 @@ class OpenRouterClient:
         }
         for attempt in range(2):
             try:
-                print(f"  ⚡ Switching to NVIDIA NIM Fallback ({settings.nvidia_model})...")
+                print(f"  [llm] Calling NVIDIA NIM ({settings.nvidia_model})...")
                 resp = requests.post(url, headers=headers, json=payload, timeout=90)
                 resp.raise_for_status()
                 content = resp.json()["choices"][0]["message"]["content"] or ""
@@ -86,7 +86,7 @@ class OpenRouterClient:
 
 
             except Exception as exc:
-                print(f"  ⚠️ NVIDIA NIM attempt {attempt + 1} error: {exc}")
+                print(f"  [llm] NVIDIA NIM attempt {attempt + 1} warning: {exc}")
                 time.sleep(2)
 
         return None
@@ -210,9 +210,26 @@ Portfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/
 GitHub: https://github.com/sanjeev200009
 Location: Colombo, Sri Lanka"""
 
+        # Determine job focus category for dynamic tailored pitch
+        combined_desc = f"{job_title} {job_desc}".lower()
+        if any(x in combined_desc for x in ("ai", "llm", "agent", "machine learning", "nlp", "automation", "generative", "product engineer")):
+            category_focus = "AI_PRODUCT"
+            focus_instruction = "SPECIALIZED FOCUS: AI / LLM / Product Engineering. Lead with your autonomous 13-stage AI recruitment pipeline (processing 115,000+ candidate profiles with 8 agents), Python FastAPI, and LLM workflow integrations."
+        elif any(x in combined_desc for x in ("frontend", "react", "next.js", "nextjs", "ui", "ux", "tailwind", "typescript", "framer", "shadcn")):
+            category_focus = "FRONTEND"
+            focus_instruction = "SPECIALIZED FOCUS: Frontend / UI Development. Lead with your complete rebuild of the Career141 production Next.js 15 website from scratch using React.js, TypeScript, Tailwind CSS, and Framer Motion."
+        elif any(x in combined_desc for x in ("backend", "node", "express", "api", "rest", "sql", "postgresql", "database", "cloud", "aws", "cloudflare", "microservice", "docker")):
+            category_focus = "BACKEND_DEV"
+            focus_instruction = "SPECIALIZED FOCUS: Backend & Cloud Engineering. Lead with your custom email delivery platform that cut costs by 78%, RESTful API microservices, PostgreSQL database design, Docker, and AWS/Cloudflare serverless infrastructure."
+        else:
+            category_focus = "GENERAL_SOFTWARE"
+            focus_instruction = "SPECIALIZED FOCUS: General Software / Full-Stack Engineering. Provide a balanced pitch highlighting full-stack web development (Next.js 15, React, Python FastAPI) and production AI automation achievements."
+
         try:
             system = f"""You are a professional job application email writer. Write a compelling, 
 personalized job application email body (2 to 3 paragraphs, 150-200 words) from a junior software developer to a recruiter.
+
+{focus_instruction}
 
 CANDIDATE PROFILE:
 - Full Name: Sivasuthakaran Sanjeev
@@ -225,7 +242,7 @@ CANDIDATE PROFILE:
 - Education: BIT (Hons) in Networking & Mobile Computing, Horizon Campus
 - Experience: Under 1 year (fresh/junior — recently promoted from Web Developer Intern to Associate Product & AI Engineer)
 
-KEY PRODUCTION ACHIEVEMENTS AT CAREER141 (HIGHLIGHT 1-2 OF THESE):
+KEY PRODUCTION ACHIEVEMENTS AT CAREER141 (TAILOR BASED ON SPECIALIZED FOCUS):
 - Built and owns an autonomous 13-stage AI recruitment pipeline processing 115,000+ candidate profiles
 - Engineered a custom email automation platform that cut email delivery costs by 78%
 - Rebuilt the Career141 Next.js 15 website from scratch (production, live)
@@ -238,13 +255,12 @@ RULES:
 1. Write 2 to 3 body paragraphs explaining how the candidate's technical skills match the job description.
 2. The email MUST be personalized to the SPECIFIC COMPANY NAME ({company}) and SPECIFIC JOB TITLE ({job_title}).
 3. Identify 3-5 specific requirements from the job description that match the candidate's real skills.
-4. Use a professional but warm tone. Not robotic. Not generic.
-5. DO NOT invent skills, fake projects, or false experience.
-6. DO NOT mention salary, expected compensation, or notice period anywhere.
-7. Include a note that CV/resume is attached to this email.
-8. When applying to AI/Product/Full-Stack roles: prominently mention the Career141 13-stage AI pipeline and LLM experience.
-9. When applying to Frontend/React roles: highlight Next.js 15 website rebuild and React production experience.
-10. Output ONLY the 2-3 body paragraphs. DO NOT output any reasoning, thinking process, greetings, headers, subject lines, or sign-offs."""
+4. Apply the {category_focus} specialization instructions provided above.
+5. Use a professional but warm tone. Not robotic. Not generic.
+6. DO NOT invent skills, fake projects, or false experience.
+7. DO NOT mention salary, expected compensation, or notice period anywhere.
+8. Include a note that CV/resume is attached to this email.
+9. Output ONLY the 2-3 body paragraphs. DO NOT output any reasoning, thinking process, greetings, headers, subject lines, or sign-offs."""
 
             user = (
                 f"COMPANY: {company}\n"
@@ -292,6 +308,6 @@ RULES:
 
 
         except Exception as exc:
-            print(f"  ⚠️ LLM call fallback for email application: {exc}")
+            print(f"  [llm] Fallback for email application: {exc}")
 
         return {"subject": subject, "body": fallback_body}

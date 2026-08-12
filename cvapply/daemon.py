@@ -44,6 +44,16 @@ def run_daemon_cycle(submit: bool, app_batch_limit: int) -> None:
         print(f"Apply error: {exc}")
         telegram.send_message(f"⚠️ Application run error: {exc}")
 
+    from .inbox_tracker import check_inbox
+
+    # Step 3: Check Gmail Inbox for recruiter replies and ping Telegram
+    print("\n[Stage 3/3] Checking Gmail Inbox for recruiter replies...")
+    try:
+        replies_found = check_inbox()
+        print(f"Inbox check completed: {replies_found} recruiter replies discovered.")
+    except Exception as exc:
+        print(f"Inbox check error: {exc}")
+
     print(f"\n{'='*60}")
     print("✅ Cycle finished successfully.")
     print(f"{'='*60}\n")

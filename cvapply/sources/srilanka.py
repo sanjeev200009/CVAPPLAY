@@ -163,16 +163,23 @@ class XpressJobsSource(JobSource):
 
 
 class TopJobsSource(JobSource):
-    """Scrapes TopJobs.lk via Playwright browser search form."""
+    """
+    Deep Playwright scraper for TopJobs Sri Lanka IT & Tech vacancies.
+    Fetches vacancies across IT, Software, Web, and AI categories.
+    """
 
     name = "topjobs"
 
     SEARCH_TERMS = [
         "software engineer",
-        "junior developer",
-        "web developer",
+        "developer",
         "python",
         "react",
+        "fullstack",
+        "web developer",
+        "associate software engineer",
+        "trainee software engineer",
+        "ai engineer",
     ]
 
     def fetch(self) -> list[Job]:
@@ -197,27 +204,39 @@ class TopJobsSource(JobSource):
                     page.wait_for_timeout(2500)
 
                     html = page.content()
-                    links = re.findall(r'href="(/applicant/job[^"]*jobVacancyId=(\d+)[^"]*)"', html)
+                    links = re.findall(r'href="(/applicant/job[^"]*jobVacancyId=(\d+)[^"]*)"', html, re.IGNORECASE)
+                    if not links:
+                        links = re.findall(r'href="([^"]*acancyDetail[^"]*acancyId=(\d+)[^"]*)"', html, re.IGNORECASE)
 
-                    for path, job_id in links[:10]:
+                    for path, job_id in links[:12]:
                         if job_id in seen:
                             continue
                         seen.add(job_id)
-                        job_url = f"https://topjobs.lk{path}"
+                        job_url = f"https://topjobs.lk{path}" if path.startswith("/") else path
 
                         try:
                             page.goto(job_url, wait_until="domcontentloaded", timeout=20000)
                             page.wait_for_timeout(1000)
 
-                            title_m = re.search(r"<title[^>]*>([^<|]+)", page.content())
+                            html_content = page.content()
+                            title_m = re.search(r"<title[^>]*>([^<|]+)", html_content, re.IGNORECASE)
                             title = re.sub(r"\s*[-|].*$", "", title_m.group(1).strip()) if title_m else f"Role {job_id}"
-                            if not _TECH_KEYWORDS.search(title) or _TITLE_BLOCK_RE.search(title):
+
+                            # Clean up generic title wrappers
+                            title = re.sub(r"^(topjobs|vacancy|job)\s*:\s*", "", title, flags=re.IGNORECASE).strip()
+                            if not title or len(title) < 3:
+                                title = f"Software Role ({term.title()})"
+
+                            if not _TECH_KEYWORDS.search(title) and not _TECH_KEYWORDS.search(term):
+                                continue
+                            if _TITLE_BLOCK_RE.search(title):
                                 continue
 
                             body = page.locator("body").inner_text()
-                            company_m = re.search(r"(?:company|employer|organisation)\s*[:\-]?\s*([^\n]{3,60})", body, re.IGNORECASE)
-                            company = company_m.group(1).strip() if company_m else "Company"
+                            company_m = re.search(r"(?:company|employer|organisation|organization)\s*[:\-]?\s*([^\n]{3,60})", body, re.IGNORECASE)
+                            company = company_m.group(1).strip() if company_m else "Sri Lanka IT Company"
 
+                            # Use 3-tier resolver to extract direct hiring email
                             email = _extract_email(body)
                             apply_target = f"mailto:{email}" if email else job_url
 
