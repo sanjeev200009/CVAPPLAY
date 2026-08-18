@@ -131,15 +131,19 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
             subject = email_res["subject"]
             letter = email_res["body"]
             send_application_email(email, subject, letter, settings.cv_file_path)
-            from cvapply.apply import _log_application
-            _log_application(
-                convex,
-                job_id,
-                letter,
-                "success",
-                None,
-                {"channel": "email", "recruiter_email": email, "subject": subject},
-            )
+            applied = True
+            try:
+                from cvapply.apply import _log_application
+                _log_application(
+                    convex,
+                    job_id,
+                    letter,
+                    "success",
+                    None,
+                    {"channel": "email", "recruiter_email": email, "subject": subject},
+                )
+            except Exception as log_exc:
+                print(f"  [whatsapp] Convex application log note: {log_exc}")
 
             msg = (
                 f"📱 **WHATSAPP JOB AUTO-APPLIED!**\n\n"
@@ -151,7 +155,6 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
                 f"✅ **Application CV Dispatched via Gmail SMTP!**"
             )
             telegram.send_message(msg)
-            applied = True
         except Exception as exc:
             error_msg = str(exc)
             msg = (
