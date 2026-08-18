@@ -131,8 +131,7 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
             subject = email_res["subject"]
             letter = email_res["body"]
             send_application_email(email, subject, letter, settings.cv_file_path)
-
-            convex.mutation("mutations:updateJob", {"job_id": job_id, "status": "applied"})
+            upsert_job(convex, job_obj, status="applied", tier="sri_lanka")
             convex.mutation(
                 "mutations:insertApplication",
                 {
