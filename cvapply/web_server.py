@@ -113,6 +113,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json_response({"status": "started", "message": "Live application batch started in background."})
             return
 
+        if path in ("/api/whatsapp/ingest", "/api/whatsapp/webhook"):
+            content_len = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else ""
+            try:
+                data = json.loads(post_body) if post_body.startswith("{") else {"text": post_body}
+            except Exception:
+                data = {"text": post_body}
+
+            text = data.get("text") or data.get("body") or data.get("message") or post_body
+            from cvapply.whatsapp_listener import ingest_whatsapp_job
+
+            def _ingest():
+                try:
+                    ingest_whatsapp_job(text, submit=True)
+                except Exception as e:
+                    print(f"WhatsApp ingestion error: {e}")
+
+            threading.Thread(target=_ingest, daemon=True).start()
+            self._json_response({"status": "received", "message": "WhatsApp vacancy received & processing auto-application."})
+            return
+
         self.send_response(404)
         self.end_headers()
 
