@@ -257,65 +257,68 @@ def _apply_form(
     submit: bool,
     headed: bool,
 ) -> bool:
+    company = job.get("company", "")
     try:
         from playwright.sync_api import sync_playwright
-    except Exception as exc:
-        print(f"  ℹ️ Playwright browser automation unavailable in cloud environment ({exc}) — skipping web portal auto-fill for {job.get('company', '')}")
-        return False
 
-    job_id = job.get("_id")
-    title = job.get("title", "")
-    company = job.get("company", "")
-    score = job.get("match_score", 0)
-    submitted = False
-    with sync_playwright() as p:
-        browser = p.chromium.launch(channel="msedge", headless=not headed)
-        context = browser.new_context(
-            locale="en-US", viewport={"width": 1280, "height": 900}
-        )
-        page = context.new_page()
-        handler = handler_cls(page)
-        url = handler.apply_url(job)
-        print(f"  opening {url}")
-        try:
-            page.goto(url, timeout=60000, wait_until="domcontentloaded")
-            handler.prepare_page()
-            if not handler.detection_ok():
-                raise RuntimeError("ATS form not detected on page")
-            handler.fill_known_fields(job, letter)
-            handler.screenshot(job, "filled")
-            if not submit:
+        job_id = job.get("_id")
+        title = job.get("title", "")
+        score = job.get("match_score", 0)
+        submitted = False
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=not headed)
+            context = browser.new_context(
+                locale="en-US", viewport={"width": 1280, "height": 900}
+            )
+            page = context.new_page()
+            handler = handler_cls(page)
+            url = handler.apply_url(job)
+            print(f"  opening {url}")
+            try:
+                page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                handler.prepare_page()
+                if not handler.detection_ok():
+                    raise RuntimeError("ATS form not detected on page")
+                handler.fill_known_fields(job, letter)
+                handler.screenshot(job, "filled")
+                if not submit:
+                    payload = handler.payload
+                    payload["mode"] = "dry_run_no_submit"
+                    insert_log(
+                        convex,
+                        "info",
+                        f"dry-run fill {company} — {title} (score {score})",
+                        {"details": payload, "job_id": job_id},
+                    )
+                    print("  dry-run fill complete (no submit) - see screenshot")
+                    browser.close()
+                    return False
+                submitted = handler.submit()
+                handler.screenshot(job, "submitted" if submitted else "failed")
                 payload = handler.payload
-                payload["mode"] = "dry_run_no_submit"
-                insert_log(
+                _log_application(
                     convex,
-                    "info",
-                    f"dry-run fill {company} — {title} (score {score})",
-                    {"details": payload, "job_id": job_id},
+                    job_id,
+                    letter,
+                    "success" if submitted else "failed",
+                    None if submitted else "submit button not confirmed",
+                    payload,
                 )
-                print("  dry-run fill complete (no submit) - see screenshot")
+                status_str = "SUCCESS" if submitted else "UNCONFIRMED"
+                msg = _format_telegram_msg("🤖", f"WEB FORM {status_str}", job, score)
+                telegram.send_message(msg)
+                print(f"  submitted: {submitted}")
+                browser.close()
+                return submitted
+            except Exception as exc:
+                handler.screenshot(job, "error")
+                _log_application(convex, job_id, letter, "failed", str(exc), handler.payload)
+                print(f"  failed: {exc}")
                 browser.close()
                 return False
-            submitted = handler.submit()
-            handler.screenshot(job, "submitted" if submitted else "failed")
-            payload = handler.payload
-            if submitted:
-                _log_application(convex, job_id, letter, "success", None, payload)
-                msg = _format_telegram_msg("✅", "APPLICATION SUBMITTED VIA PORTAL", job, score)
-                telegram.send_message(msg)
-                print("  SUBMITTED VIA PORTAL")
-            else:
-                err = payload.get("validation_errors") or [payload.get("submit_error", "submission not confirmed")]
-                _log_application(convex, job_id, letter, "failed", str(err)[:300], payload)
-                print(f"  portal submit failed: {err}")
-        except Exception as exc:
-            handler.screenshot(job, "error")
-            _log_application(convex, job_id, letter, "failed", str(exc)[:300], handler.payload)
-            print(f"  portal error: {exc}")
-        finally:
-            browser.close()
-
-    return submitted
+    except Exception as exc:
+        print(f"  ℹ️ Web portal auto-fill unavailable for {company}: {exc}")
+        return False
 
 
 
