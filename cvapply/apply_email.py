@@ -307,7 +307,17 @@ def send_application_email(
         to_email, subject, body, cv_path, settings.cv_file_name
     )
     context = ssl.create_default_context()
-    with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=60) as server:
-        server.starttls(context=context)
-        server.login(settings.email_user, settings.email_app_password)
-        server.send_message(msg)
+
+    # Force IPv4 socket resolution to prevent [Errno 101] Network is unreachable on cloud containers
+    orig_getaddrinfo = socket.getaddrinfo
+    def _ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+    socket.getaddrinfo = _ipv4_getaddrinfo
+    try:
+        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=60) as server:
+            server.starttls(context=context)
+            server.login(settings.email_user, settings.email_app_password)
+            server.send_message(msg)
+    finally:
+        socket.getaddrinfo = orig_getaddrinfo
