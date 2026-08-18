@@ -61,7 +61,7 @@ class Settings:
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
 
-    match_threshold: int = int(os.getenv("MATCH_THRESHOLD", "55"))
+    match_threshold: int = int(os.getenv("MATCH_THRESHOLD", "15"))
     daily_app_cap: int = int(os.getenv("DAILY_APP_CAP", "1000"))
     min_delay_seconds: int = int(os.getenv("MIN_DELAY", "3"))
     max_delay_seconds: int = int(os.getenv("MAX_DELAY", "8"))
