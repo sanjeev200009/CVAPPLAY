@@ -2,6 +2,7 @@ services:
   - type: web
     name: cvapply-engine
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python -m cvapply.web_server
     autoDeploy: true

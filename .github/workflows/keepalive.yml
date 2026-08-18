@@ -1,0 +1,17 @@
+name: Render 24/7 Keep-Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes to prevent Render Free tier from spinning down
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Web Dashboard & Engine
+        run: |
+          echo "Pinging Render Free Instance to keep it alive 24/7..."
+          curl -s -f -m 60 "https://cvapplay.onrender.com/api/stats" || curl -s -m 60 "https://cvapplay.onrender.com/"
+          echo "Ping successful. Render instance is awake and running."
