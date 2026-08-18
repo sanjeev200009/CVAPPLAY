@@ -35,7 +35,7 @@ HANDLERS: dict[str, Any] = {
 def _daily_applied_count(convex: ConvexClient) -> int:
     since = int(time.time() * 1000) - 26 * 3600 * 1000
     docs = convex.query("queries:applicationsSince", {"since": since}) or []
-    return len(docs)
+    return sum(1 for d in docs if d.get("submission_status") == "success")
 
 
 def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:

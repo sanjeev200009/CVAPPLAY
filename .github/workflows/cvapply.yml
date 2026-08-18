@@ -1,0 +1,44 @@
+name: CV Apply 24/7 Engine Workflow
+
+on:
+  schedule:
+    # Runs every 3 hours 24/7 without stopping
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-cvapply-daemon-cycle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Auto-Sourcing, Scoring & Application Cycle
+        env:
+          CONVEX_DEPLOY_URL: ${{ secrets.CONVEX_DEPLOY_URL }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_MODEL: ${{ secrets.NVIDIA_MODEL }}
+          EMAIL_APPLY_ENABLED: "1"
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          CV_PDF_PATH: "./sanjeevcv.pdf (6) (1).pdf"
+          CV_FILE_PATH: "./sanjeevcv.pdf (6) (1).pdf"
+          DAILY_APP_CAP: "50"
+        run: |
+          python -m cvapply.daemon --submit --interval 0 --batch-limit 10

@@ -118,7 +118,6 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "mitra": "careers@mitrai.com",
     "enactor": "careers@enactor.co",
     "linearsix": "careers@linearsix.com",
-    "affinity": "careers@affinity.lk",
     "ism apac": "careers@ismapac.com",
     "stax": "careers@stax.com",
     "kitemetrics": "careers@kitemetrics.com",
@@ -218,16 +217,17 @@ def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "
 
 def verify_email_recipient_exists(to_email: str) -> bool:
     """
+    Pre-flight validation before initiating SMTP delivery.
     Verifies that an email address has a valid format, belongs to a real domain with DNS records,
-    and is non-blacklisted before sending. Returns True ONLY for safe, valid addresses.
+    and is non-blacklisted. Returns True ONLY for safe, valid addresses.
     """
     if not to_email or "@" not in to_email:
         return False
 
     to_clean = to_email.lower().strip()
 
-    # Reject known placeholder / dummy domains
-    if any(x in to_clean for x in ("example.com", "example.org", "noreply", "no-reply", "w3.org", "sentry.io")):
+    # Reject known placeholder / dummy / non-hiring addresses
+    if any(x in to_clean for x in ("example.com", "example.org", "noreply", "no-reply", "w3.org", "sentry.io", "unsubscribe")):
         return False
 
     # Perform DNS domain network check

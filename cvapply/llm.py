@@ -61,10 +61,10 @@ class OpenRouterClient:
             ],
             "max_tokens": max_tokens,
         }
-        for attempt in range(2):
+        for attempt in range(1):
             try:
                 print(f"  [llm] Calling NVIDIA NIM ({settings.nvidia_model})...")
-                resp = requests.post(url, headers=headers, json=payload, timeout=90)
+                resp = requests.post(url, headers=headers, json=payload, timeout=10)
                 resp.raise_for_status()
                 content = resp.json()["choices"][0]["message"]["content"] or ""
                 # Clean thinking process preamble by finding the LAST occurrence of "Dear " for email bodies

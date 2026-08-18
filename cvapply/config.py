@@ -47,7 +47,7 @@ class Settings:
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
 
     match_threshold: int = int(os.getenv("MATCH_THRESHOLD", "55"))
-    daily_app_cap: int = int(os.getenv("DAILY_APP_CAP", "250"))
+    daily_app_cap: int = int(os.getenv("DAILY_APP_CAP", "1000"))
     min_delay_seconds: int = int(os.getenv("MIN_DELAY", "3"))
     max_delay_seconds: int = int(os.getenv("MAX_DELAY", "8"))
     max_experience_years: int = 1
@@ -58,7 +58,7 @@ class Settings:
     scoring_model: str = "google/gemini-2.5-flash"
     cover_letter_model: str = "openai/gpt-4o-mini"
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
+    nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
 
 
     cv_pdf_path: str = os.getenv("CV_PDF_PATH", r"C:\Users\user\Downloads\sanjeevcv.pdf (6) (1).pdf")
