@@ -9,8 +9,10 @@ from .himalayas import HimalayasSource
 from .lever import LeverSource
 from .remotive import RemotiveSource
 from .srilanka import (
+    DevJobsLKSource,
     DreamJobsLKSource,
     ITJobsLKSource,
+    ITProLKSource,
     IkmanJobsSource,
     JobseekerLKSource,
     LinkedInSriLankaSource,
@@ -26,6 +28,8 @@ def build_sources() -> list[JobSource]:
         # ── Sri Lanka local boards & Direct IT Company Hiring Emails (TOP PRIORITY) ──
         SriLankaDirectITCompanySource(),
         XpressJobsSource(),
+        ITProLKSource(),
+        DevJobsLKSource(),
         TopJobsSource(),
         IkmanJobsSource(),
         DreamJobsLKSource(),

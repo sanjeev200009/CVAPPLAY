@@ -630,3 +630,119 @@ class ITJobsLKSource(JobSource):
             self.errors.append(f"itjobs fetch: {str(exc)[:100]}")
         return jobs
 
+
+class ITProLKSource(JobSource):
+    """Fetches Sri Lanka tech & IT vacancies from ITPro.lk (RSS & direct web)."""
+
+    name = "itpro_lk"
+
+    CATEGORIES = [
+        "https://itpro.lk/jobs/information-technology/",
+        "https://itpro.lk/jobs/web-development/",
+        "https://itpro.lk/jobs/devops-cloud/",
+        "https://itpro.lk/jobs/software-engineering/",
+    ]
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        seen: set[str] = set()
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+        for cat_url in self.CATEGORIES:
+            try:
+                resp = requests.get(cat_url, headers=headers, timeout=15)
+                if resp.status_code != 200:
+                    continue
+
+                html = resp.text
+                job_links = set(re.findall(r'href="([^"]*itpro\.lk/job/\d+/[^"]+)"', html))
+                for job_url in list(job_links)[:15]:
+                    jid_m = re.search(r'/job/(\d+)/([^/]+)', job_url)
+                    if not jid_m:
+                        continue
+                    jid = jid_m.group(1)
+                    slug = jid_m.group(2)
+                    if jid in seen:
+                        continue
+                    seen.add(jid)
+
+                    clean_slug = slug.replace("-at-", " | ").replace("-", " ").title()
+                    parts = clean_slug.split(" | ")
+                    title = parts[0].strip() if parts else "IT Role"
+                    company = parts[1].strip() if len(parts) > 1 else "Sri Lanka IT Employer"
+
+                    if not _TECH_KEYWORDS.search(title) and not _TECH_KEYWORDS.search(slug):
+                        continue
+
+                    email = _extract_email(slug)
+                    apply_target = f"mailto:{email}" if email else job_url
+
+                    jobs.append(Job(
+                        source=self.name,
+                        external_id=jid,
+                        company=company[:100],
+                        title=title[:120],
+                        location=LK_LOCATION,
+                        remote=False,
+                        description=f"{title} position at {company} in Sri Lanka via ITPro.lk.",
+                        apply_url=apply_target,
+                    ))
+            except Exception as exc:
+                self.errors.append(f"itpro_lk fetch {cat_url}: {str(exc)[:100]}")
+
+        return jobs
+
+
+class DevJobsLKSource(JobSource):
+    """Fetches Sri Lanka developer positions from DevJobs.lk."""
+
+    name = "devjobs_lk"
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        seen: set[str] = set()
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+        try:
+            url = "https://devjobs.lk/"
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                html = resp.text
+                job_ids = set(re.findall(r'href="[^"]*devjobs\.lk/dev-jobs/client/ads/(\d+)"', html))
+                for jid in list(job_ids)[:20]:
+                    if jid in seen:
+                        continue
+                    seen.add(jid)
+                    job_url = f"https://devjobs.lk/dev-jobs/client/ads/{jid}"
+
+                    try:
+                        r_detail = requests.get(job_url, headers=headers, timeout=10)
+                        if r_detail.status_code == 200:
+                            body = r_detail.text
+                            title_m = re.search(r"<h[12][^>]*>([^<]+)", body, re.IGNORECASE)
+                            title = title_m.group(1).strip() if title_m else f"Software Engineer ({jid})"
+                            title = re.sub(r"^(devjobs|job|vacancy)\s*:\s*", "", title, flags=re.IGNORECASE).strip()
+
+                            comp_m = re.search(r"(?:company|at|employer)\s*[:\-]?\s*([^\n<]{3,50})", body, re.IGNORECASE)
+                            company = comp_m.group(1).strip() if comp_m else "Sri Lanka Dev Firm"
+
+                            email = _extract_email(body)
+                            apply_target = f"mailto:{email}" if email else job_url
+
+                            jobs.append(Job(
+                                source=self.name,
+                                external_id=jid,
+                                company=company[:100],
+                                title=title[:120],
+                                location=LK_LOCATION,
+                                remote=False,
+                                description=_clean_text(body)[:5000],
+                                apply_url=apply_target,
+                            ))
+                    except Exception:
+                        pass
+        except Exception as exc:
+            self.errors.append(f"devjobs fetch: {str(exc)[:100]}")
+
+        return jobs
+
