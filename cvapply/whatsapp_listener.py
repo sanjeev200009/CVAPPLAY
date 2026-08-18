@@ -131,18 +131,14 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
             subject = email_res["subject"]
             letter = email_res["body"]
             send_application_email(email, subject, letter, settings.cv_file_path)
-            upsert_job(convex, job_obj, status="applied", tier="sri_lanka")
-            convex.mutation(
-                "mutations:insertApplication",
-                {
-                    "job_id": job_id,
-                    "company": company,
-                    "title": title,
-                    "mode": "email",
-                    "status": "success",
-                    "cover_letter": letter[:2000],
-                    "timestamp": str(int(time.time())),
-                },
+            from cvapply.apply import _log_application
+            _log_application(
+                convex,
+                job_id,
+                letter,
+                "success",
+                None,
+                {"channel": "email", "recruiter_email": email, "subject": subject},
             )
 
             msg = (
