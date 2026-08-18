@@ -257,7 +257,11 @@ def _apply_form(
     submit: bool,
     headed: bool,
 ) -> bool:
-    from playwright.sync_api import sync_playwright
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:
+        print(f"  ℹ️ Playwright browser automation unavailable in cloud environment ({exc}) — skipping web portal auto-fill for {job.get('company', '')}")
+        return False
 
     job_id = job.get("_id")
     title = job.get("title", "")
