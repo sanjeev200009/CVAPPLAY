@@ -94,7 +94,7 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
     from cvapply.cv import load_cv
     from cvapply.llm import OpenRouterClient
     from cvapply.sources.base import Job
-    from cvapply.store import upsert_job
+    from cvapply.store import upsert_job, upsert_job_doc
 
     job_obj = Job(
         source="whatsapp",
@@ -113,8 +113,8 @@ def ingest_whatsapp_job(text: str, submit: bool = True) -> dict[str, Any]:
     match_score = float(score_result.get("score", 85.0))
     summary = score_result.get("summary", f"{title} at {company}")
 
-    upsert_job(convex, job_obj, status="scored", tier="sri_lanka")
-    job_id = external_id
+    doc_id = upsert_job_doc(convex, job_obj, status="scored", tier="sri_lanka")
+    job_id = doc_id or external_id
 
     applied = False
     error_msg = None

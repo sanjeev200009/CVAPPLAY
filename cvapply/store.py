@@ -35,6 +35,17 @@ def upsert_job(client: ConvexClient, job: Job, status: str, tier: str) -> bool:
     return bool(result and result.get("created"))
 
 
+def upsert_job_doc(client: ConvexClient, job: Job, status: str, tier: str) -> str | None:
+    """Returns the Convex document ID (_id) of the inserted/existing job."""
+    result = client.mutation(
+        "mutations:upsertJob",
+        {"job": job_to_doc(job, status, tier, int(time.time() * 1000))},
+    )
+    if result and isinstance(result, dict):
+        return result.get("id")
+    return None
+
+
 def insert_log(client: ConvexClient, level: str, message: str, context: dict[str, Any] | None = None) -> None:
     args: dict[str, Any] = {
         "level": level,
