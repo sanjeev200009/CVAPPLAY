@@ -112,7 +112,6 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "directfn": "careers@directfn.com",
 
     # AI Studios, Product Houses & High-Growth SaaS
-    "arimac": "careers@arimac.digital",
     "zebra": "careers@zebra.com",
     "ironone": "careers@irononetoolbox.com",
     "boardpac": "careers@boardpac.co",
@@ -205,11 +204,11 @@ def is_valid_email_domain(email: str) -> bool:
 
 def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "") -> str | None:
     """
-    Strict 3-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
+    Strict 2-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
       Tier 0: Block ATS-only companies immediately (never email, use web portal)
-      Tier 1: Real-time regex extraction from job description (explicitly provided email)
-      Tier 2: Master Sri Lanka IT Directory (65+ verified tech companies)
-      Tier 3: Smart Domain Resolution from apply_url with DNS validation
+      Tier 1: Real-time regex extraction from job description (explicitly provided email by employer)
+      Tier 2: Master Sri Lanka IT Directory (verified tech company hiring inboxes)
+      Note: Domain guessing is strictly disabled to guarantee 0% bounce rate.
     """
     # Tier 0: Block known ATS-only companies that have no direct email inbox
     company_lower = company.lower() if company else ""
@@ -233,19 +232,6 @@ def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "
     if from_dir:
         if is_valid_email_domain(from_dir):
             return from_dir
-
-    # Tier 3: Smart Domain Resolution from apply_url with DNS validation
-    if apply_url and "://" in apply_url:
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(apply_url)
-            host = parsed.netloc.lower().replace("www.", "").replace("careers.", "").replace("jobs.", "")
-            if host and "." in host and not any(x in host for x in ("google", "facebook", "linkedin", "xpressjobs", "topjobs")):
-                candidate_email = f"careers@{host}"
-                if is_valid_email_domain(candidate_email):
-                    return candidate_email
-        except Exception:
-            pass
 
     # Strictly NO domain guessing — if no explicit or directory email, fallback to Web Portal
     return None
