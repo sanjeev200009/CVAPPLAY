@@ -8,7 +8,16 @@ from .greenhouse import GreenhouseSource
 from .himalayas import HimalayasSource
 from .lever import LeverSource
 from .remotive import RemotiveSource
-from .srilanka import LinkedInSriLankaSource, SriLankaDirectITCompanySource, TopJobsSource, XpressJobsSource
+from .srilanka import (
+    DreamJobsLKSource,
+    ITJobsLKSource,
+    IkmanJobsSource,
+    JobseekerLKSource,
+    LinkedInSriLankaSource,
+    SriLankaDirectITCompanySource,
+    TopJobsSource,
+    XpressJobsSource,
+)
 from .weworkremotely import WeWorkRemotelySource
 
 
@@ -16,8 +25,12 @@ def build_sources() -> list[JobSource]:
     return [
         # ── Sri Lanka local boards & Direct IT Company Hiring Emails (TOP PRIORITY) ──
         SriLankaDirectITCompanySource(),
-        TopJobsSource(),
         XpressJobsSource(),
+        TopJobsSource(),
+        IkmanJobsSource(),
+        DreamJobsLKSource(),
+        JobseekerLKSource(),
+        ITJobsLKSource(),
         LinkedInSriLankaSource(),
 
         # ── Global remote boards ──

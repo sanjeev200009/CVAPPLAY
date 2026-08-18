@@ -442,3 +442,167 @@ class SriLankaDirectITCompanySource(JobSource):
                 ))
         return jobs
 
+
+class IkmanJobsSource(JobSource):
+    """Fetches Sri Lanka tech & IT vacancies from Ikman.lk marketplace."""
+
+    name = "ikman_lk"
+
+    SEARCH_KEYWORDS = ["software", "developer", "web developer", "it assistant", "network", "intern"]
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        seen: set[str] = set()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/html",
+        }
+
+        for kw in self.SEARCH_KEYWORDS:
+            try:
+                url = f"https://ikman.lk/en/ads/sri-lanka/jobs?query={requests.utils.quote(kw)}"
+                resp = requests.get(url, headers=headers, timeout=15)
+                if resp.status_code != 200:
+                    continue
+
+                html = resp.text
+                matches = re.findall(r'href="(/en/ad/([^"]+))"', html)
+                for path, ad_slug in matches[:10]:
+                    if ad_slug in seen:
+                        continue
+                    seen.add(ad_slug)
+                    ad_url = f"https://ikman.lk{path}"
+
+                    title_parts = ad_slug.split("-for-sale-")[0].split("-in-")[0].replace("-", " ").title()
+                    if not _TECH_KEYWORDS.search(title_parts) or _JUNK_TITLES.search(title_parts):
+                        continue
+
+                    email = _extract_email(ad_slug)
+                    apply_target = f"mailto:{email}" if email else ad_url
+
+                    jobs.append(Job(
+                        source=self.name,
+                        external_id=_slug_id("ikman", ad_slug),
+                        company="Sri Lanka Employer (Ikman.lk)",
+                        title=title_parts[:120],
+                        location=LK_LOCATION,
+                        remote=False,
+                        description=f"Position: {title_parts} in Sri Lanka via Ikman.lk Jobs portal.",
+                        apply_url=apply_target,
+                    ))
+            except Exception as exc:
+                self.errors.append(f"ikman term '{kw}': {str(exc)[:100]}")
+
+        return jobs
+
+
+class DreamJobsLKSource(JobSource):
+    """Fetches Sri Lanka vacancies from DreamJobs.lk."""
+
+    name = "dreamjobs_lk"
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            url = "https://www.dreamjobs.lk/jobs/category/IT-Software"
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                html = resp.text
+                job_links = re.findall(r'href="(/job/view/[^"]+)"', html)
+                seen: set[str] = set()
+                for link in job_links[:15]:
+                    if link in seen:
+                        continue
+                    seen.add(link)
+                    job_url = f"https://www.dreamjobs.lk{link}"
+                    slug = link.split("/")[-1].replace("-", " ").title()
+                    if _TECH_KEYWORDS.search(slug) and not _TITLE_BLOCK_RE.search(slug):
+                        jobs.append(Job(
+                            source=self.name,
+                            external_id=_slug_id("dreamjobs", link),
+                            company="DreamJobs Sri Lanka Client",
+                            title=slug[:120],
+                            location=LK_LOCATION,
+                            remote=False,
+                            description=f"IT & Software opening: {slug} on DreamJobs.lk Sri Lanka.",
+                            apply_url=job_url,
+                        ))
+        except Exception as exc:
+            self.errors.append(f"dreamjobs fetch: {str(exc)[:100]}")
+        return jobs
+
+
+class JobseekerLKSource(JobSource):
+    """Fetches Sri Lanka vacancies from Jobseeker.lk."""
+
+    name = "jobseeker_lk"
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            url = "https://jobseeker.lk/vacancies?category=IT"
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                html = resp.text
+                job_links = re.findall(r'href="(/vacancy/view/[^"]+)"', html)
+                seen: set[str] = set()
+                for link in job_links[:15]:
+                    if link in seen:
+                        continue
+                    seen.add(link)
+                    job_url = f"https://jobseeker.lk{link}"
+                    slug = link.split("/")[-1].replace("-", " ").title()
+                    if _TECH_KEYWORDS.search(slug) and not _TITLE_BLOCK_RE.search(slug):
+                        jobs.append(Job(
+                            source=self.name,
+                            external_id=_slug_id("jobseeker", link),
+                            company="Jobseeker Sri Lanka Client",
+                            title=slug[:120],
+                            location=LK_LOCATION,
+                            remote=False,
+                            description=f"Tech opening: {slug} on Jobseeker.lk Sri Lanka.",
+                            apply_url=job_url,
+                        ))
+        except Exception as exc:
+            self.errors.append(f"jobseeker fetch: {str(exc)[:100]}")
+        return jobs
+
+
+class ITJobsLKSource(JobSource):
+    """Fetches Sri Lanka vacancies from ITJobs.lk."""
+
+    name = "itjobs_lk"
+
+    def fetch(self) -> list[Job]:
+        jobs: list[Job] = []
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            url = "https://www.itjobs.lk/vacancies"
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                html = resp.text
+                job_links = re.findall(r'href="(/job/[^"]+)"', html)
+                seen: set[str] = set()
+                for link in job_links[:15]:
+                    if link in seen:
+                        continue
+                    seen.add(link)
+                    job_url = f"https://www.itjobs.lk{link}"
+                    slug = link.split("/")[-1].replace("-", " ").title()
+                    if _TECH_KEYWORDS.search(slug):
+                        jobs.append(Job(
+                            source=self.name,
+                            external_id=_slug_id("itjobs", link),
+                            company="ITJobs Sri Lanka Client",
+                            title=slug[:120],
+                            location=LK_LOCATION,
+                            remote=False,
+                            description=f"IT vacancy: {slug} on ITJobs.lk Sri Lanka.",
+                            apply_url=job_url,
+                        ))
+        except Exception as exc:
+            self.errors.append(f"itjobs fetch: {str(exc)[:100]}")
+        return jobs
+
