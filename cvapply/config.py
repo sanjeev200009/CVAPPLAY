@@ -38,6 +38,21 @@ REMOTIVE_CATEGORIES: list[str] = [
 ]
 
 
+def _resolve_cv_pdf_path() -> str:
+    env_path = os.getenv("CV_PDF_PATH", "")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    # Fallback to project root directory
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    default_pdf = os.path.join(root_dir, "sanjeevcv.pdf (6) (1).pdf")
+    if os.path.exists(default_pdf):
+        return default_pdf
+    for f in os.listdir(root_dir):
+        if f.endswith(".pdf"):
+            return os.path.join(root_dir, f)
+    return env_path or default_pdf
+
+
 @dataclass(frozen=True)
 class Settings:
     convex_deploy_url: str = os.getenv("CONVEX_DEPLOY_URL", "")
@@ -53,15 +68,12 @@ class Settings:
     max_experience_years: int = 1
     only_sri_lanka: bool = os.getenv("ONLY_SRI_LANKA", "1") == "1"
 
-
-
     scoring_model: str = "google/gemini-2.5-flash"
     cover_letter_model: str = "openai/gpt-4o-mini"
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
     nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
 
-
-    cv_pdf_path: str = os.getenv("CV_PDF_PATH", r"C:\Users\user\Downloads\sanjeevcv.pdf (6) (1).pdf")
+    cv_pdf_path: str = _resolve_cv_pdf_path()
     cv_version_label: str = "v2"
 
     # Candidate contact details (used to fill application forms)
