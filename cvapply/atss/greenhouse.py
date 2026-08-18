@@ -3,7 +3,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from playwright.sync_api import Page
+try:
+    from playwright.sync_api import Page
+except ImportError:
+    Page = Any
 
 from ..config import settings
 from .base import AtsHandler

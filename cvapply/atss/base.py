@@ -5,7 +5,11 @@ import re
 import time
 from typing import Any
 
-from playwright.sync_api import Locator, Page
+try:
+    from playwright.sync_api import Locator, Page
+except ImportError:
+    Locator = Any
+    Page = Any
 
 from ..config import settings
 
