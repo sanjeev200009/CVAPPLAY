@@ -38,8 +38,8 @@ REMOTIVE_CATEGORIES: list[str] = [
 ]
 
 
-def _resolve_cv_pdf_path() -> str:
-    env_path = os.getenv("CV_PDF_PATH", "")
+def _resolve_cv_pdf_path(env_var: str = "CV_PDF_PATH") -> str:
+    env_path = os.getenv(env_var, "")
     if env_path and os.path.exists(env_path):
         return env_path
     # Fallback to project root directory
@@ -48,9 +48,9 @@ def _resolve_cv_pdf_path() -> str:
     if os.path.exists(default_pdf):
         return default_pdf
     for f in os.listdir(root_dir):
-        if f.endswith(".pdf"):
+        if f.lower().endswith(".pdf"):
             return os.path.join(root_dir, f)
-    return env_path or default_pdf
+    return default_pdf
 
 
 @dataclass(frozen=True)
@@ -73,7 +73,7 @@ class Settings:
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
     nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
 
-    cv_pdf_path: str = _resolve_cv_pdf_path()
+    cv_pdf_path: str = _resolve_cv_pdf_path("CV_PDF_PATH")
     cv_version_label: str = "v2"
 
     # Candidate contact details (used to fill application forms)
@@ -96,7 +96,6 @@ class Settings:
     candidate_expected_salary_usd: str = os.getenv("CANDIDATE_EXPECTED_SALARY_USD", "$35,000 - $45,000 USD / year")
     candidate_start_date: str = os.getenv("CANDIDATE_START_DATE", "Immediately / 2 weeks")
 
-
     # Email-based applications (Gmail SMTP with App Password)
     email_enabled: bool = os.getenv("EMAIL_APPLY_ENABLED", "0") == "1"
     email_smtp_host: str = os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
@@ -104,7 +103,8 @@ class Settings:
     email_user: str = os.getenv("EMAIL_USER", "sanjaysanjeev2000@gmail.com")
     email_app_password: str = os.getenv("EMAIL_APP_PASSWORD", "")
 
-    cv_file_path: str = os.getenv("CV_FILE_PATH", cv_pdf_path)
+    cv_file_path: str = _resolve_cv_pdf_path("CV_FILE_PATH")
+    cv_file_name: str = os.getenv("CV_FILE_NAME", "Sanjeev_CV.pdf")
     cv_file_name: str = os.getenv("CV_FILE_NAME", "Sanjeev_CV.pdf")
     screenshots_dir: str = os.path.join(os.path.dirname(__file__), "..", "screenshots")
 
