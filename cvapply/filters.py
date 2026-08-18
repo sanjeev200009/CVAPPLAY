@@ -24,11 +24,12 @@ BAD_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Target software/tech roles
+# Target software, networking, IT support, systems, and tech roles
 TECH_TITLE_RE = re.compile(
     r"\b(software|developer|engineer|frontend|front-end|backend|back-end|fullstack|full-stack|"
-    r"web|python|react|javascript|typescript|ai|ml|data|node|api|qa|test|tester|intern|internship|"
-    r"graduate|support engineer|cloud|devops|systems|linux)\b",
+    r"web|python|react|javascript|typescript|ai|ml|data|node|api|qa|sqa|test|tester|intern|internship|"
+    r"graduate|associate|trainee|support|it support|network|networking|sysadmin|systems|system|administrator|"
+    r"helpdesk|technician|infrastructure|cyber|security|cloud|devops|linux|database|dba|technical|it|ict)\b",
     re.IGNORECASE,
 )
 
