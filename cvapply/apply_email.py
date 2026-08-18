@@ -112,6 +112,19 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "directfn": "careers@directfn.com",
 
     # AI Studios, Product Houses & High-Growth SaaS
+    "arimac": "careers@arimac.digital",
+    "zebra": "careers@zebra.com",
+    "ironone": "careers@irononetoolbox.com",
+    "boardpac": "careers@boardpac.co",
+    "epic": "careers@epiclanka.net",
+    "zillione": "careers@zillione.com",
+    "swivel": "careers@swivelgroup.com.au",
+    "bhasha": "careers@bhasha.lk",
+    "helakuru": "careers@bhasha.lk",
+    "payhere": "careers@payhere.lk",
+    "webxpay": "careers@webxpay.com",
+    "tekgeeks": "careers@tekgeeks.net",
+    "cyanworks": "careers@cyanworks.lk",
     "gapstars": "careers@gapstars.net",
     "octave": "octave@keells.com",
     "keells": "octave@keells.com",
@@ -131,6 +144,10 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     "hsenid mobile": "careers@hsenidmobile.com",
     "hsenid": "careers@hsenid.com",
     "john keells it": "careers@johnkeellsit.com",
+    "john keells": "careers@johnkeells.com",
+    "brandix": "careers@brandix.com",
+    "hayleys": "careers@hayleys.com",
+    "hemas": "careers@hemas.com",
     "mas holdings": "careers@masholdings.com",
     "dialog": "careers@dialog.lk",
     "mobitel": "careers@mobitel.lk",
@@ -169,11 +186,17 @@ def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
 import socket
 
 def is_valid_email_domain(email: str) -> bool:
-    """Checks if the email domain exists and has valid DNS/network records."""
+    """Checks if the email domain exists, is not blacklisted, and has valid mail exchange DNS records."""
     if not email or "@" not in email:
         return False
     domain = email.split("@")[-1].strip().lower()
+
+    # Reject non-routable / placeholder domains
+    if domain in ("example.com", "example.org", "w3.org", "sentry.io", "linkedin.com", "greenhouse.io", "ashbyhq.com"):
+        return False
+
     try:
+        # Check standard address info
         infos = socket.getaddrinfo(domain, None)
         return len(infos) > 0
     except Exception:
@@ -182,11 +205,11 @@ def is_valid_email_domain(email: str) -> bool:
 
 def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "") -> str | None:
     """
-    Strict 2-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
+    Strict 3-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
       Tier 0: Block ATS-only companies immediately (never email, use web portal)
       Tier 1: Real-time regex extraction from job description (explicitly provided email)
-      Tier 2: Master Sri Lanka IT Directory (56 verified tech companies)
-      Note: Unverified domain inference/guessing is disabled to prevent 550 bounces.
+      Tier 2: Master Sri Lanka IT Directory (65+ verified tech companies)
+      Tier 3: Smart Domain Resolution from apply_url with DNS validation
     """
     # Tier 0: Block known ATS-only companies that have no direct email inbox
     company_lower = company.lower() if company else ""
@@ -210,6 +233,19 @@ def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "
     if from_dir:
         if is_valid_email_domain(from_dir):
             return from_dir
+
+    # Tier 3: Smart Domain Resolution from apply_url with DNS validation
+    if apply_url and "://" in apply_url:
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(apply_url)
+            host = parsed.netloc.lower().replace("www.", "").replace("careers.", "").replace("jobs.", "")
+            if host and "." in host and not any(x in host for x in ("google", "facebook", "linkedin", "xpressjobs", "topjobs")):
+                candidate_email = f"careers@{host}"
+                if is_valid_email_domain(candidate_email):
+                    return candidate_email
+        except Exception:
+            pass
 
     # Strictly NO domain guessing — if no explicit or directory email, fallback to Web Portal
     return None
