@@ -222,12 +222,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self._json_response({"logs": [l.strip() for l in lines]})
 
 
-def run_web_server(port: int = 5000) -> None:
+def run_web_server(port: int | None = None) -> None:
+    if port is None:
+        port = int(os.getenv("PORT", "5000"))
     os.makedirs(WEB_DIR, exist_ok=True)
+
+    # Launch background daemon engine thread if enabled
+    if os.getenv("DISABLE_DAEMON", "0") != "1":
+        def _daemon_worker():
+            try:
+                from cvapply.daemon import start_daemon
+                print("🚀 Auto-starting background CV Apply daemon engine inside web server process...")
+                start_daemon(interval_hours=3.0, submit=True, batch_limit=50)
+            except Exception as e:
+                print(f"Background daemon thread error: {e}")
+
+        threading.Thread(target=_daemon_worker, daemon=True).start()
+
     server = HTTPServer(("0.0.0.0", port), DashboardHandler)
     print(f"\n{'='*60}")
-    print(f"✨ CV APPLY CONTROL DASHBOARD ONLINE")
-    print(f"🌐 Access Dashboard UI at: http://localhost:{port}")
+    print(f"✨ CV APPLY CONTROL DASHBOARD & BACKGROUND ENGINE ONLINE")
+    print(f"🌐 Server Listening on Port: {port}")
     print(f"{'='*60}\n")
     try:
         server.serve_forever()
