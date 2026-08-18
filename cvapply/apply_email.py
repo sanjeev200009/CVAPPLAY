@@ -315,9 +315,29 @@ def send_application_email(
 
     socket.getaddrinfo = _ipv4_getaddrinfo
     try:
-        with smtplib.SMTP(settings.email_smtp_host, settings.email_smtp_port, timeout=60) as server:
-            server.starttls(context=context)
-            server.login(settings.email_user, settings.email_app_password)
-            server.send_message(msg)
+        # Try SSL port 465 first (most reliable on cloud platforms like Render)
+        sent = False
+        last_error = None
+        ports_to_try = [465, 587] if settings.email_smtp_port == 465 else [settings.email_smtp_port, 465]
+        for port in list(dict.fromkeys(ports_to_try)):
+            try:
+                if port == 465:
+                    with smtplib.SMTP_SSL(settings.email_smtp_host, 465, context=context, timeout=25) as server:
+                        server.login(settings.email_user, settings.email_app_password)
+                        server.send_message(msg)
+                        sent = True
+                        break
+                else:
+                    with smtplib.SMTP(settings.email_smtp_host, port, timeout=25) as server:
+                        server.starttls(context=context)
+                        server.login(settings.email_user, settings.email_app_password)
+                        server.send_message(msg)
+                        sent = True
+                        break
+            except Exception as e:
+                last_error = e
+                continue
+        if not sent and last_error:
+            raise last_error
     finally:
         socket.getaddrinfo = orig_getaddrinfo

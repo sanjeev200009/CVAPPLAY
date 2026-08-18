@@ -253,8 +253,11 @@ def run_web_server(port: int | None = None) -> None:
         def _daemon_worker():
             try:
                 from cvapply.daemon import start_daemon
-                print("🚀 Auto-starting background CV Apply daemon engine inside web server process...")
-                start_daemon(interval_hours=3.0, submit=True, batch_limit=50)
+                interval = float(os.getenv("DAEMON_INTERVAL_HOURS", "0.25"))
+                submit = os.getenv("DAEMON_SUBMIT", "1") == "1"
+                batch_limit = int(os.getenv("DAEMON_BATCH_LIMIT", "20"))
+                print(f"🚀 Auto-starting background CV Apply daemon engine (interval={interval}h, submit={submit}, batch_limit={batch_limit})...")
+                start_daemon(interval_hours=interval, submit=submit, batch_limit=batch_limit)
             except Exception as e:
                 print(f"Background daemon thread error: {e}")
 
