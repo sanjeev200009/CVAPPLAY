@@ -193,6 +193,18 @@ def test_apply_refuses_template_and_dedupes_recipients():
     assert "emailed_this_run" in src, "one recruiter must not get several letters per run"
 
 
+def test_apply_gate_rechecks_title():
+    """Jobs stored before the title filter was fixed still reach the apply
+    stage: the scorer gave "Trainee / Junior Key Accounts Executive" a 100."""
+    src = open("cvapply/apply.py", encoding="utf-8").read()
+    assert "TECH_TITLE_RE.search(j.get(" in src, "the apply gate must re-check the title"
+
+    from cvapply.filters import TECH_TITLE_RE as R
+    assert not R.search("Trainee / Junior Key Accounts Executive")
+    assert not R.search("Trainee - Internship | Kiribathgoda/ Kegalle/ Kandy")
+    assert R.search("Intern - IT (Business Intelligence)")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

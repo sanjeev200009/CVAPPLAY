@@ -17,6 +17,7 @@ from .apply_email import derive_company_email, extract_apply_email, resolve_recr
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
 from .atss.xpressjobs import XpressJobsHandler
+from .filters import TECH_TITLE_RE
 from .portal_session import PORTALS, storage_state_for
 from .config import settings
 from .convex_api import ConvexClient
@@ -86,9 +87,17 @@ def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
 
     tier_a: list[dict] = []
     tier_b: list[dict] = []
+    skipped_non_tech: list[str] = []
 
     for j in jobs:
         if j.get("status") != "scored":
+            continue
+        # The title filter runs at sourcing time, so jobs stored before it was
+        # corrected are still in here -- and the scorer rated "Trainee / Junior
+        # Key Accounts Executive" at 100. Re-check at the gate that actually
+        # sends, so a high score can never carry a non-technical role through.
+        if not TECH_TITLE_RE.search(j.get("title") or ""):
+            skipped_non_tech.append(j.get("title") or "?")
             continue
         score = j.get("match_score") or 0
         tier = (j.get("match_tier") or "").upper()
@@ -126,6 +135,9 @@ def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
         and (j.get("match_tier") or "").upper() == "B"
         and _has_hard_gap(j.get("match_reason", ""), j.get("description", ""))
     ]
+    if skipped_non_tech:
+        print(f"  Skipped {len(skipped_non_tech)} non-technical title(s), e.g. "
+              f"{'; '.join(skipped_non_tech[:3])}")
     print(
         f"  Tier A (auto-apply): {len(tier_a)} | "
         f"Tier B (caution): {len(tier_b)} | "
