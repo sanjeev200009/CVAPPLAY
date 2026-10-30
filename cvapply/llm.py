@@ -14,24 +14,43 @@ API_URL = "https://openrouter.ai/api/v1/chat/completions"
 SCORE_SYSTEM = """You are a strict technical hiring screener evaluating an early-career software engineer.
 
 Candidate Profile:
-- Name: Sivasuthakaran Sanjeev (Colombo, Sri Lanka — Remote applicant)
-- Practical Experience: UNDER 1 YEAR (~0-1 year total experience).
-- Core Stack: Python, FastAPI, Node.js, JavaScript, TypeScript, React.js, Next.js, REST APIs, PostgreSQL, Git, LiveKit, WebSockets.
+- Name: Sivasuthakaran Sanjeev (Colombo, Sri Lanka — open to remote worldwide)
+- Experience: UNDER 1 YEAR (~0-1 year total, recent promotion from intern to Associate Product & AI Engineer)
+- Core Stack: Python, FastAPI, Node.js, JavaScript, TypeScript, React.js, Next.js 15, REST APIs, PostgreSQL, Git, Docker, Linux, AWS, Cloudflare, Supabase, Convex, WebSockets, LLM integrations
+- Frameworks: FastAPI, Flask, Express.js, React, Next.js, Tailwind CSS, Framer Motion
+- Education: BIT (Hons) Networking & Mobile Computing — Horizon Campus, Sri Lanka
+- Notable achievements: Built 13-stage autonomous AI recruitment pipeline (115k+ profiles), rebuilt production Next.js 15 site, cut email costs 78%, WhatsApp Business API automation
+- Location: Colombo, Sri Lanka (available for fully remote roles worldwide and on-site Sri Lanka roles)
+- Salary expectation: 60,000–70,000 LKR/month (Sri Lanka) or $35,000–$45,000 USD/year (remote)
 
-STRICT SCREENING RULES:
-1. EXPERIENCE HARD CEILING: If the JD requires 2+, 3+, 4+, or 5+ years of experience, or is a Mid/Senior/Staff/Lead/Principal role, you MUST give score < 30 and recommended: false.
-2. HIGH SCORE (75-100): True entry-level, junior, associate, graduate, intern, or early-career roles (0-1 yr exp) that align with candidate's modern web/full-stack tech stack.
-3. Extract salary/compensation mentioned in the JD (e.g. "$50,000 - $70,000", "€40k/yr", "$35/hr") or write "Not specified".
-4. Write a 1-2 sentence concise plain-text summary of what the role actually entails.
+SCORING DIMENSIONS — evaluate all 8:
+1. TECH STACK MATCH: Do the required technologies match candidate's core stack? Python/JS/TS/React/Node/PostgreSQL = strong match.
+2. FRAMEWORK MATCH: Are the specific frameworks required (FastAPI, Next.js, React, Express) in candidate's skill set?
+3. SENIORITY MATCH: Is this a junior/associate/graduate/intern/entry-level role? Senior/Lead/Staff/Principal = hard fail.
+4. EXPERIENCE GATE: Does the JD require 2+ years? If yes, score < 30 regardless of tech match.
+5. REMOTE/LOCATION: Is this remote or Sri Lanka based? Region-locked to Europe/US-only = penalise heavily.
+6. SALARY ALIGNMENT: Does stated salary align with expectations? No salary mentioned = neutral.
+7. EMPLOYMENT TYPE: Full-time preferred. Contract/freelance/part-time = slight penalty unless explicitly good match.
+8. EDUCATION MATCH: Does the required degree/field match candidate's BIT in Networking & Mobile Computing?
 
-Output JSON ONLY:
+STRICT RULES:
+1. EXPERIENCE HARD CEILING: JD requires 2+, 3+, 4+, 5+ years OR is Mid/Senior/Staff/Lead/Principal → score < 30, recommended: false.
+2. TIER A (score 75–100): True entry-level, junior, associate, graduate, intern roles that directly match candidate's stack. Auto-apply.
+3. TIER B (score 50–74): Reasonable match with 1-2 minor gaps candidate could overcome. Apply with caution.
+4. TIER C (score 0–49): Poor fit — wrong seniority, wrong stack, too much experience required, region-locked. Do not apply.
+5. Extract salary/compensation from JD exactly as written, or "Not specified".
+6. Summarise what the role does in 1-2 plain sentences.
+7. If you detect a HARD GAP (e.g. mandatory certification, security clearance, specific degree not held, 2+ years required), note it in the reason field starting with "HARD GAP:".
+
+Output JSON ONLY — no prose, no markdown, no explanation:
 {
   "score": <int 0-100>,
+  "match_tier": "<A|B|C>",
   "recommended": <bool>,
-  "reason": "<short 1-line reason>",
-  "experience_requirement_years": <int>,
+  "reason": "<1-line reason, start with HARD GAP: if applicable>",
+  "experience_requirement_years": <int or 0>,
   "salary": "<extracted salary or 'Not specified'>",
-  "summary": "<1-2 sentence plain-language description of what this job does>"
+  "summary": "<1-2 sentence plain-language role description>"
 }"""
 
 
@@ -54,17 +73,25 @@ class OpenRouterClient:
             "Accept": "application/json",
         }
         payload = {
-            "model": settings.nvidia_model or "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "model": settings.nvidia_model or "meta/llama-3.2-11b-vision-instruct",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
             "max_tokens": max_tokens,
         }
-        for attempt in range(1):
+        for attempt in range(3):
             try:
                 print(f"  [llm] Calling NVIDIA NIM ({settings.nvidia_model})...")
-                resp = requests.post(url, headers=headers, json=payload, timeout=10)
+                resp = requests.post(url, headers=headers, json=payload, timeout=30)
+                if resp.status_code in (404, 410):
+                    print(f"  [llm] NVIDIA NIM model '{settings.nvidia_model}' returned HTTP {resp.status_code} (Model unavailable or deprecated).")
+                    break
+                if resp.status_code == 429:
+                    wait = 5 * (attempt + 1)
+                    print(f"  [llm] NVIDIA NIM 429 rate limit — backing off {wait}s (attempt {attempt + 1}/3)")
+                    time.sleep(wait)
+                    continue
                 resp.raise_for_status()
                 content = resp.json()["choices"][0]["message"]["content"] or ""
                 # Clean thinking process preamble by finding the LAST occurrence of "Dear " for email bodies
@@ -83,15 +110,47 @@ class OpenRouterClient:
 
                 return content
 
-
-
             except Exception as exc:
-                print(f"  [llm] NVIDIA NIM attempt {attempt + 1} warning: {exc}")
-                time.sleep(2)
+                print(f"  [llm] NVIDIA NIM attempt {attempt + 1}/3 warning: {exc}")
+                time.sleep(2 * (attempt + 1))
 
         return None
 
 
+
+    def _call_openrouter(self, model: str, system: str, user: str, max_tokens: int = 700, json_mode: bool = True) -> str | None:
+        """OpenRouter fallback — used when NVIDIA NIM is unavailable."""
+        if not self.api_key:
+            return None
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        try:
+            print(f"  [llm] Calling OpenRouter fallback ({model})...")
+            resp = requests.post(
+                API_URL,
+                headers=self.headers,
+                json=payload,
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if "choices" not in data:
+                # OpenRouter returns HTTP 200 with an error body for upstream 429s
+                print(f"  [llm] OpenRouter {model}: {str(data.get('error'))[:160]}")
+                return None
+            content = data["choices"][0]["message"]["content"] or ""
+            return content.strip()
+        except Exception as exc:
+            print(f"  [llm] OpenRouter fallback warning: {exc}")
+            return None
 
     def chat(
         self,
@@ -101,12 +160,22 @@ class OpenRouterClient:
         max_tokens: int = 700,
         json_mode: bool = True,
     ) -> str:
-        # ── EXCLUSIVE PRIMARY ENGINE: NVIDIA NIM (Nemotron 3.5 Lightning 30B) ──
+        # ── PRIMARY: NVIDIA NIM ──
         nvidia_res = self._call_nvidia_nim(system, user, max_tokens)
         if nvidia_res:
             return nvidia_res
 
-        raise RuntimeError("NVIDIA NIM service temporarily busy - using instant template generator")
+        # ── FALLBACK: OpenRouter ──
+        # Try the requested model first, then the configured fallback. The free
+        # pool rate-limits per-model, so a second model is the usual rescue.
+        for or_model in dict.fromkeys([model, settings.openrouter_fallback_model]):
+            if not or_model:
+                continue
+            or_res = self._call_openrouter(or_model, system, user, max_tokens, json_mode)
+            if or_res:
+                return or_res
+
+        raise RuntimeError("Both NVIDIA NIM and OpenRouter are unavailable — check API keys and rate limits")
 
 
 
@@ -115,9 +184,19 @@ class OpenRouterClient:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
+            # Reasoning models emit thinking prose first, so scan from each "{"
+            # and keep the last one that decodes. Plain regex grabs braces from
+            # the prose and fails.
+            best = None
+            for i, ch in enumerate(text):
+                if ch != "{":
+                    continue
+                try:
+                    best = json.JSONDecoder().raw_decode(text, i)[0]
+                except ValueError:
+                    continue
+            if isinstance(best, dict):
+                return best
             raise
 
     def score_job(self, job_title: str, job_desc: str, cv_text: str) -> dict[str, Any]:
@@ -129,15 +208,27 @@ class OpenRouterClient:
             "CANDIDATE CV:\n"
             f"{cv_text[:2500]}"
         )
-        text = self.chat(settings.scoring_model, SCORE_SYSTEM, user, max_tokens=400)
+        text = self.chat(settings.scoring_model, SCORE_SYSTEM, user, max_tokens=3000, json_mode=False)
         data = self.parse_json(text)
         sal = str(data.get("salary", "")).strip()
         if not sal or sal.lower() in ("not specified", "none", "null"):
             from .filters import extract_salary
             sal = extract_salary(job_desc)
 
+        score = int(data.get("score", 0))
+        # Derive tier from score if LLM didn't return it
+        raw_tier = str(data.get("match_tier", "")).upper().strip()
+        if raw_tier not in ("A", "B", "C"):
+            if score >= 75:
+                raw_tier = "A"
+            elif score >= 50:
+                raw_tier = "B"
+            else:
+                raw_tier = "C"
+
         return {
-            "score": int(data.get("score", 0)),
+            "score": score,
+            "match_tier": raw_tier,
             "recommended": bool(data.get("recommended", False)),
             "reason": str(data.get("reason", ""))[:200],
             "experience_requirement_years": data.get("experience_requirement_years"),

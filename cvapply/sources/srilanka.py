@@ -14,6 +14,7 @@ from typing import Any
 import requests
 
 from .base import Job, JobSource
+from ..config import settings
 
 LK_LOCATION = "Colombo, Sri Lanka"
 
@@ -53,7 +54,11 @@ def _clean_text(text: str) -> str:
 def _extract_email(text: str) -> str | None:
     for m in re.finditer(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", text):
         email = m.group(0).lower()
-        if not any(x in email for x in ("example", "noreply", "no-reply", "xpress", "topjobs", "linkedin")):
+        if not any(x in email for x in (
+            "example", "noreply", "no-reply", "xpress", "topjobs", "linkedin",
+            "itpro", "devjobs", "dreamjobs", "jobseeker", "itjobs", "ikman",
+            "jobstreet", "indeed", "glassdoor", "w3.org", "sentry.io"
+        )):
             return email
     return None
 
@@ -78,31 +83,16 @@ class XpressJobsSource(JobSource):
 
     name = "xpressjobs"
 
-    QUERIES = [
-        {"keywords": "software engineer"},
-        {"keywords": "developer"},
-        {"keywords": "python"},
-        {"keywords": "react"},
-        {"keywords": "web developer"},
-        {"keywords": "fullstack"},
-        {"keywords": "frontend"},
-        {"keywords": "backend"},
-        {"keywords": "junior developer"},
-        {"keywords": "trainee software engineer"},
-        {"keywords": "associate software engineer"},
-        {"keywords": "next.js developer"},
-        {"keywords": "AI engineer"},
-        {"keywords": "product engineer"},
-        {"keywords": "node.js developer"},
-        {"keywords": "fastapi"},
-        {"keywords": "automation engineer"},
-        {"keywords": "data engineer"},
-        {"keywords": "cloud engineer"},
-        {"keywords": "associate product engineer"},
-        {"SectorId": 30},  # IT-SWare / Internet
-        {"SectorId": 142}, # Startup / Tech-startup
-        {"SectorId": 145}, # Work From Home / Hybrid
-    ]
+    @property
+    def QUERIES(self) -> list[dict]:
+        """Build query list from canonical search titles + sector IDs."""
+        keyword_queries = [{"keywords": title} for title in settings.search_titles]
+        sector_queries = [
+            {"SectorId": 30},   # IT-Software / Internet
+            {"SectorId": 142},  # Startup / Tech-startup
+            {"SectorId": 145},  # Work From Home / Hybrid
+        ]
+        return keyword_queries + sector_queries
 
     def fetch(self) -> list[Job]:
         jobs: list[Job] = []
@@ -170,17 +160,9 @@ class TopJobsSource(JobSource):
 
     name = "topjobs"
 
-    SEARCH_TERMS = [
-        "software engineer",
-        "developer",
-        "python",
-        "react",
-        "fullstack",
-        "web developer",
-        "associate software engineer",
-        "trainee software engineer",
-        "ai engineer",
-    ]
+    @property
+    def SEARCH_TERMS(self) -> list[str]:
+        return settings.search_titles
 
     def fetch(self) -> list[Job]:
         jobs: list[Job] = []
@@ -275,12 +257,10 @@ class LinkedInSriLankaSource(JobSource):
 
     name = "linkedin_lk"
 
-    SEARCH_TERMS = [
-        "junior software engineer Sri Lanka",
-        "junior developer Sri Lanka",
-        "associate software engineer Sri Lanka",
-        "python developer Sri Lanka",
-    ]
+    @property
+    def SEARCH_TERMS(self) -> list[str]:
+        base = settings.search_titles[:6]
+        return [f"{t} Sri Lanka" for t in base]
 
     def fetch(self) -> list[Job]:
         jobs: list[Job] = []
@@ -674,8 +654,7 @@ class ITProLKSource(JobSource):
                     if not _TECH_KEYWORDS.search(title) and not _TECH_KEYWORDS.search(slug):
                         continue
 
-                    email = _extract_email(slug)
-                    apply_target = f"mailto:{email}" if email else job_url
+                    apply_target = job_url
 
                     jobs.append(Job(
                         source=self.name,

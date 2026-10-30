@@ -32,7 +32,36 @@ ATS_ONLY_COMPANIES: set[str] = {
     "pagerduty", "elastic", "redis", "mongodb", "cockroachdb",
     "confluent", "dbt", "airbyte", "prefect", "dagster", "metabase",
     "retool", "planetscale", "neon", "railway", "fly.io", "render",
-    # Add any company whose apply_url points to greenhouse/lever/ashby
+}
+
+# Job aggregators, job boards, and ATS platforms — NEVER send direct emails to these domains
+BLOCKED_EMAIL_DOMAINS: set[str] = {
+    # Sri Lankan job boards & aggregators
+    "itpro.lk", "topjobs.lk", "xpress.jobs", "devjobs.lk", "dreamjobs.lk",
+    "jobseeker.lk", "itjobs.lk", "ikman.lk", "jobstreet.lk", "jobstreet.com",
+    "careers.lk", "jobsinlanka.com", "sljobportal.lk", "rozee.pk",
+    # Global job boards & platforms
+    "linkedin.com", "indeed.com", "glassdoor.com", "wellfound.com",
+    "himalayas.app", "remotive.com", "weworkremotely.com", "jobicy.com",
+    "arbeitnow.com", "landingjobs.co", "fourdayweek.io", "getonbrd.com",
+    "workatastartup.com", "startup.jobs", "pyjobs.com", "jobgether.com",
+    "nodesk.co", "naukri.com", "hirist.com", "monster.com", "dice.com",
+    "careerbuilder.com", "ziprecruiter.com", "simplyhired.com",
+    # ATS and tracking systems (must use web portal / handler, not direct email)
+    "greenhouse.io", "ashbyhq.com", "lever.co", "workday.com",
+    "smartrecruiters.com", "workable.com", "bamboohr.com", "icims.com",
+    "recruitee.com", "breezy.hr", "pinpointhq.com", "dover.com", "rippling.com",
+    "myworkdayjobs.com", "taleo.net", "successfactors.com", "jobvite.com",
+    # Placeholders & non-routable domains
+    "example.com", "example.org", "w3.org", "sentry.io", "google.com", "facebook.com",
+}
+
+# Individual email addresses known to bounce (550 No Such User) or block external applications
+BLOCKED_EMAILS: set[str] = {
+    "careers@ebeyonds.com",  # Blocked by Microsoft 365 Exchange tenant policy (EXOSmtpErrors)
+    "careers@itpro.lk",      # 550 No Such User Here (job board, not employer)
+    "info@itpro.lk",
+    "contact@itpro.lk",
 }
 
 
@@ -42,7 +71,10 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
     if apply_url and "mailto:" in apply_url.lower():
         match = EMAIL_RE.search(apply_url)
         if match:
-            return match.group(0).lower()
+            email = match.group(0).lower().rstrip(".,;:")
+            domain = email.split("@")[-1] if "@" in email else ""
+            if domain not in BLOCKED_EMAIL_DOMAINS and email not in BLOCKED_EMAILS:
+                return email
 
     if not description:
         return None
@@ -56,6 +88,10 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
         if email in seen:
             continue
         seen.add(email)
+
+        domain = email.split("@")[-1] if "@" in email else ""
+        if domain in BLOCKED_EMAIL_DOMAINS or email in BLOCKED_EMAILS:
+            continue
 
         # Ignore common non-hiring placeholder emails
         if any(x in email for x in ("example.com", "example.org", "noreply", "no-reply", "@linkedin.com", "@greenhouse.io", "@ashbyhq.com", "@lever.co", "sentry.io", "w3.org")):
@@ -74,13 +110,15 @@ def extract_apply_email(description: str, apply_url: str = "") -> str | None:
     # 3. Fallback: return ANY valid non-blacklisted email found in description
     for match in EMAIL_RE.finditer(desc):
         email = match.group(0).lower().rstrip(".,;:")
+        domain = email.split("@")[-1] if "@" in email else ""
+        if domain in BLOCKED_EMAIL_DOMAINS or email in BLOCKED_EMAILS:
+            continue
         if not any(x in email for x in ("example.com", "example.org", "noreply", "no-reply", "@linkedin.com", "@greenhouse.io", "@ashbyhq.com", "@lever.co", "w3.org")):
             return email
 
     return None
 
 
-# Dictionary of verified, active Sri Lanka tech hiring emails
 # Master Directory of verified, active Sri Lanka tech hiring emails (SLASSCOM / ICTA / Top Colombo IT Houses)
 VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     # Tier-1 Tech Giants & Multinational Centers
@@ -114,7 +152,6 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
     # AI Studios, Product Houses & High-Growth SaaS
     "orel it": "careers@orelit.com",
     "orelit": "careers@orelit.com",
-    "ebeyonds": "careers@ebeyonds.com",
     "hcl": "careers_srilanka@hcl.com",
     "zebra": "careers@zebra.com",
     "ironone": "careers@irononetoolbox.com",
@@ -182,20 +219,22 @@ VERIFIED_COMPANY_EMAILS: dict[str, str] = {
 
 def derive_company_email(company_name: str, apply_url: str = "") -> str | None:
     """
-    Returns a verified hiring email address for known Sri Lanka IT companies,
-    or None if no verified email exists or if company is ATS-only (preventing email bounces).
+    Returns a verified hiring email address for known Sri Lanka IT companies from the curated directory.
+    Never guesses emails from arbitrary URLs or job aggregator domains.
     """
     if not company_name:
         return None
 
-    clean = company_name.lower()
+    clean = company_name.lower().strip()
     for ats_co in ATS_ONLY_COMPANIES:
         if ats_co in clean:
             return None
 
     for key, email in VERIFIED_COMPANY_EMAILS.items():
         if key in clean:
-            return email
+            domain = email.split("@")[-1] if "@" in email else ""
+            if domain not in BLOCKED_EMAIL_DOMAINS and email not in BLOCKED_EMAILS:
+                return email
 
     return None
 
@@ -206,27 +245,126 @@ def is_valid_email_domain(email: str) -> bool:
     """Checks if the email domain exists, is not blacklisted, and has valid mail exchange DNS records."""
     if not email or "@" not in email:
         return False
-    domain = email.split("@")[-1].strip().lower()
+    clean_email = email.lower().strip()
+    from .bounces import load_bounced
 
-    # Reject non-routable / placeholder domains
-    if domain in ("example.com", "example.org", "w3.org", "sentry.io", "linkedin.com", "greenhouse.io", "ashbyhq.com"):
+    if clean_email in BLOCKED_EMAILS or clean_email in load_bounced():
         return False
 
+    domain = clean_email.split("@")[-1].strip()
+    if domain in BLOCKED_EMAIL_DOMAINS:
+        return False
+
+    return _domain_accepts_mail(domain)
+
+
+_MX_CACHE: dict[str, bool] = {}
+
+
+def _domain_accepts_mail(domain: str) -> bool:
+    """True only if the domain publishes a mail route.
+
+    A plain A-record lookup (what this used to do) passes any domain that merely
+    has a website, which is why guessed careers@ addresses bounced 550. 10 of the
+    88 directory domains have a site but no mail server at all.
+    """
+    if domain in _MX_CACHE:
+        return _MX_CACHE[domain]
+    ok = False
     try:
-        # Check standard address info
-        infos = socket.getaddrinfo(domain, None)
-        return len(infos) > 0
-    except Exception:
-        return False
+        import dns.resolver
+
+        try:
+            ok = len(dns.resolver.resolve(domain, "MX")) > 0
+        except (dns.resolver.Timeout, dns.resolver.NoNameservers, dns.exception.DNSException) as exc:
+            # Transient lookup failure (burst timeouts, flaky link) is NOT proof
+            # the domain cannot receive mail. Caching it would blacklist a real
+            # employer for the whole run -- skip this send, retry next cycle.
+            if isinstance(exc, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
+                _MX_CACHE[domain] = False
+            return False
+        except Exception:
+            # No MX published. RFC 5321 allows an A-record fallback, but probing
+            # port 25 is useless here: the ISP blocks outbound 25, so real mail
+            # hosts (wso2.com) time out while proxies on non-mail domains answer
+            # -- backwards signal. Any employer posting jobs publishes MX, so a
+            # missing MX is treated as undeliverable.
+            ok = False
+    except ImportError:
+        # ponytail: dnspython absent -> A-record check only, the old behaviour.
+        # Bounces come back, so install dnspython rather than trusting this path.
+        try:
+            ok = len(socket.getaddrinfo(domain, None)) > 0
+        except Exception:
+            ok = False
+    _MX_CACHE[domain] = ok
+    return ok
+
+
+
+_PAGE_EMAIL_CACHE: dict[str, str | None] = {}
+
+
+def extract_email_from_page(apply_url: str) -> str | None:
+    """Read the employer's real address off the live listing page.
+
+    Stored descriptions are ~800-char summaries, so only 8 in 500 jobs carry an
+    email. The full page often does (ikman.lk listings quote the employer's
+    address directly). Board/aggregator addresses are filtered by the existing
+    BLOCKED_EMAIL_DOMAINS set, so support@ikman.lk can never be picked.
+    """
+    if not apply_url or not apply_url.startswith(("http://", "https://")):
+        return None
+    if any(ats in apply_url for ats in ("greenhouse.io", "ashbyhq.com", "lever.co",
+                                        "workday.com", "workable.com", "smartrecruiters.com")):
+        return None
+    if apply_url in _PAGE_EMAIL_CACHE:
+        return _PAGE_EMAIL_CACHE[apply_url]
+
+    # The board's own support address lives on the page too. Blocking by the
+    # listing host covers every aggregator without maintaining a domain list
+    # (ikman.lk vs ikman.com was exactly that gap).
+    from urllib.parse import urlparse
+
+    host = (urlparse(apply_url).hostname or "").lower().lstrip("www.")
+    host_stem = host.split(".")[0] if host else ""
+
+    found = None
+    try:
+        import requests
+
+        html = requests.get(
+            apply_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"}
+        ).text
+        for cand in dict.fromkeys(EMAIL_RE.findall(html)):
+            low = cand.lower().strip(".,;:")
+            if low.endswith((".png", ".jpg", ".jpeg", ".gif", ".css", ".js", ".svg", ".webp")):
+                continue
+            domain = low.split("@")[-1]
+            if domain in BLOCKED_EMAIL_DOMAINS or low in BLOCKED_EMAILS:
+                continue
+            # same registrable name as the board we scraped -> it's the board
+            if host_stem and domain.split(".")[0] == host_stem:
+                continue
+            if any(x in low for x in ("noreply", "no-reply", "example.", "sentry.io",
+                                      "unsubscribe", "wordpress", "sentry", "@w3.org")):
+                continue
+            if is_valid_email_domain(low):
+                found = low
+                break
+    except Exception as exc:
+        print(f"  [email] page scan failed for {apply_url[:60]}: {str(exc)[:80]}")
+
+    _PAGE_EMAIL_CACHE[apply_url] = found
+    return found
 
 
 def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "") -> str | None:
     """
-    Strict 2-Tier Recruiter Email Discovery (Zero-Bounce Guarantee):
+    Strict Recruiter Email Discovery (Zero-Bounce Guarantee):
       Tier 0: Block ATS-only companies immediately (never email, use web portal)
       Tier 1: Real-time regex extraction from job description (explicitly provided email by employer)
-      Tier 2: Master Sri Lanka IT Directory (verified tech company hiring inboxes)
-      Note: Domain guessing is strictly disabled to guarantee 0% bounce rate.
+      Tier 2: Master Sri Lanka IT Directory with DNS verification
     """
     # Tier 0: Block known ATS-only companies that have no direct email inbox
     company_lower = company.lower() if company else ""
@@ -245,13 +383,19 @@ def resolve_recruiter_email(company: str, job_desc: str = "", apply_url: str = "
         if is_valid_email_domain(extracted):
             return extracted
 
-    # Tier 2: Check Master Sri Lanka IT Directory
+    # Tier 1.5: Read the live listing page. Still the employer's own stated
+    # address -- accurate, unlike the directory guess below.
+    from_page = extract_email_from_page(apply_url)
+    if from_page:
+        return from_page
+
+    # Tier 2: Check Master Sri Lanka IT Directory (GUESSED careers@ addresses --
+    # last resort, gated by MX + the learned bounce blocklist)
     from_dir = derive_company_email(company, apply_url)
     if from_dir:
         if is_valid_email_domain(from_dir):
             return from_dir
 
-    # Strictly NO domain guessing — if no explicit or directory email, fallback to Web Portal
     return None
 
 
@@ -265,8 +409,15 @@ def verify_email_recipient_exists(to_email: str) -> bool:
         return False
 
     to_clean = to_email.lower().strip()
+    from .bounces import load_bounced
 
-    # Reject known placeholder / dummy / non-hiring addresses
+    if to_clean in BLOCKED_EMAILS or to_clean in load_bounced():
+        return False
+
+    domain = to_clean.split("@")[-1]
+    if domain in BLOCKED_EMAIL_DOMAINS:
+        return False
+
     if any(x in to_clean for x in ("example.com", "example.org", "noreply", "no-reply", "w3.org", "sentry.io", "unsubscribe")):
         return False
 

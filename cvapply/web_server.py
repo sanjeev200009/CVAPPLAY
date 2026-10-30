@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 # Add project root to sys.path
@@ -69,6 +70,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path in ("/health", "/ping"):
+            self._json_response({"status": "ok", "message": "CV Apply Engine is alive"}, status=200)
+            return
+
         if path in ("/", "/index.html"):
             index_path = os.path.join(WEB_DIR, "index.html")
             self._html_response(index_path)
@@ -84,6 +89,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if path == "/api/logs":
             self.handle_get_logs()
+            return
+
+        if path == "/api/manual":
+            self.handle_get_manual()
+            return
+
+        if path == "/api/reports":
+            self.handle_get_reports()
             return
 
         self.send_response(404)
@@ -181,8 +194,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "candidate_name": f"{settings.candidate_first_name} {settings.candidate_last_name}",
                 "candidate_email": settings.candidate_email,
                 "only_sri_lanka": settings.only_sri_lanka,
-                "ai_engine": "NVIDIA Nemotron 3.5 Lightning 30B (Primary)",
+                "ai_engine": "NVIDIA Nemotron 3.5 Lightning 30B (Primary) + OpenRouter (Fallback)",
                 "smtp_verification": "Active 100% Zero Bounce Pre-Verification",
+                "total_sources": 30,
             }
             self._json_response(data)
         except Exception as exc:
@@ -241,6 +255,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             lines = ["Log file engine.log initialized. Waiting for cycle output..."]
         self._json_response({"logs": [l.strip() for l in lines]})
+
+    def handle_get_manual(self) -> None:
+        """Returns jobs flagged for manual human review."""
+        try:
+            convex = ConvexClient()
+            manual_jobs = convex.query("queries:manualReviewJobs", {"limit": 50}) or []
+            result = [
+                {
+                    "id": j.get("_id"),
+                    "company": j.get("company"),
+                    "title": j.get("title"),
+                    "score": j.get("match_score"),
+                    "tier": j.get("match_tier"),
+                    "reason": j.get("manual_review_reason"),
+                    "apply_url": j.get("apply_url"),
+                    "location": j.get("location"),
+                    "created_at": j.get("created_at"),
+                }
+                for j in manual_jobs
+            ]
+            self._json_response({"manual_review_jobs": result, "count": len(result)})
+        except Exception as exc:
+            self._json_response({"error": str(exc)}, status=500)
+
+    def handle_get_reports(self) -> None:
+        """Returns the last 30 daily run reports."""
+        try:
+            convex = ConvexClient()
+            reports = convex.query("queries:recentReports", {"limit": 30}) or []
+            self._json_response({"reports": reports, "count": len(reports)})
+        except Exception as exc:
+            self._json_response({"error": str(exc)}, status=500)
 
 
 def run_web_server(port: int | None = None) -> None:
