@@ -130,6 +130,23 @@ def test_hard_gap_reads_description_not_just_reason():
     assert _has_hard_gap("", "Entry level, no experience needed.") is False
 
 
+def test_missing_score_raises_instead_of_writing_zero():
+    """run_scoring marks a job scored when score_job returns, so a defaulted 0
+    wrote the job off permanently -- 268 of 500 jobs were stuck that way."""
+    from cvapply.llm import OpenRouterClient
+
+    c = OpenRouterClient.__new__(OpenRouterClient)
+    c.chat = lambda *a, **k: "{}"
+    try:
+        c.score_job("t", "d", "cv")
+        raise AssertionError("empty verdict was accepted as score 0")
+    except ValueError:
+        pass
+    # a verdict that genuinely says 0 must still be honoured
+    c.chat = lambda *a, **k: '{"score": 0, "match_tier": "C"}'
+    assert c.score_job("t", "d", "cv")["score"] == 0
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

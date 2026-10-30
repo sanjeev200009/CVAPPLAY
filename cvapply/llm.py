@@ -218,7 +218,15 @@ class OpenRouterClient:
             from .filters import extract_salary
             sal = extract_salary(job_desc)
 
-        score = int(data.get("score", 0))
+        # A missing score must raise, never default to 0. run_scoring only
+        # marks a job "scored" when this returns, so a silent 0 wrote the job
+        # off permanently -- pendingScoring never looks at it again. That is how
+        # 241 of 500 jobs ended up stuck at 0 after the model started returning
+        # bare "{}" instead of a verdict. Raising leaves the job pending for the
+        # next cycle instead.
+        if data.get("score") is None:
+            raise ValueError(f"model returned no score: {str(data)[:160]}")
+        score = int(data["score"])
         # Derive tier from score if LLM didn't return it
         raw_tier = str(data.get("match_tier", "")).upper().strip()
         if raw_tier not in ("A", "B", "C"):
