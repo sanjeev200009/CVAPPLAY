@@ -99,8 +99,8 @@ class Settings:
     max_experience_years: int = 1
     only_sri_lanka: bool = os.getenv("ONLY_SRI_LANKA", "1") == "1"
 
-    scoring_model: str = os.getenv("SCORING_MODEL", "google/gemma-4-31b-it:free")
-    cover_letter_model: str = os.getenv("COVER_LETTER_MODEL", "google/gemma-4-31b-it:free")
+    scoring_model: str = os.getenv("SCORING_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+    cover_letter_model: str = os.getenv("COVER_LETTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
     nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.2-11b-vision-instruct")
 

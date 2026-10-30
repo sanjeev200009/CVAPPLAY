@@ -115,6 +115,21 @@ def test_gated_portal_without_session_is_not_silent():
     assert state is None or isinstance(state, dict)
 
 
+def test_hard_gap_reads_description_not_just_reason():
+    """The scoring model often returns reason:"" -- the signal is in the JD."""
+    from cvapply.apply import _has_hard_gap
+
+    # real disqualifiers
+    assert _has_hard_gap("", "Minimum 4 years of experience required.") is True
+    assert _has_hard_gap("", "At least 3 years in Django.") is True
+    assert _has_hard_gap("", "5+ years required") is True
+    assert _has_hard_gap("missing mandatory degree", "") is True
+    # a range means its floor is the requirement, not its ceiling
+    assert _has_hard_gap("", "Fresh graduates welcome. 0-2 years.") is False
+    assert _has_hard_gap("", "1-3 years experience.") is False
+    assert _has_hard_gap("", "Entry level, no experience needed.") is False
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

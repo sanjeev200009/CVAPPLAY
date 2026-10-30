@@ -83,7 +83,10 @@ class OpenRouterClient:
         for attempt in range(3):
             try:
                 print(f"  [llm] Calling NVIDIA NIM ({settings.nvidia_model})...")
-                resp = requests.post(url, headers=headers, json=payload, timeout=30)
+                # This endpoint is free but slow: a plain "say OK" takes ~20s and a
+                # full scoring call longer. The old 30s timeout made a working
+                # endpoint look dead and burned 90s of retries per job.
+                resp = requests.post(url, headers=headers, json=payload, timeout=180)
                 if resp.status_code in (404, 410):
                     print(f"  [llm] NVIDIA NIM model '{settings.nvidia_model}' returned HTTP {resp.status_code} (Model unavailable or deprecated).")
                     break

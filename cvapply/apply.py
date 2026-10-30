@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+import re
 import time
 from typing import Any
 
@@ -39,10 +40,39 @@ def _daily_applied_count(convex: ConvexClient) -> int:
     return sum(1 for d in docs if d.get("submission_status") == "success")
 
 
-def _has_hard_gap(match_reason: str) -> bool:
-    """Returns True if the match_reason signals a mandatory requirement gap."""
-    lower = (match_reason or "").lower()
-    return any(kw.lower() in lower for kw in settings.tier_b_hard_gap_keywords)
+# Captures the LOWER bound of an experience demand. A range means the floor is
+# the requirement: "0-2 years" welcomes a fresh graduate, so reading the 2 and
+# rejecting the job was backwards.
+_YEARS_RX = re.compile(
+    r"(\d{1,2})\s*(?:(?:-|–|to)\s*(\d{1,2}))?\s*\+?\s*year",
+    re.IGNORECASE,
+)
+
+
+def _has_hard_gap(match_reason: str, description: str = "") -> bool:
+    """True if the posting states a requirement the candidate cannot meet.
+
+    The keyword list ("5+ years", "requires certification") describes wording
+    found in JOB DESCRIPTIONS, not in a model's one-line reason -- and the
+    scoring model often returns reason: "" entirely, which silently disabled
+    this check and auto-applied to roles demanding years of experience. So read
+    the description too, and treat a stated experience requirement above the
+    candidate's level as a hard gap on its own.
+    """
+    blob = f"{match_reason or ''}" + chr(10) + f"{description or ''}"
+    blob = blob.lower()
+    if any(kw.lower() in blob for kw in settings.tier_b_hard_gap_keywords):
+        return True
+
+    # A numeric experience demand is the most common real disqualifier and the
+    # one keyword matching misses ("minimum 4 years", "at least 3 years").
+    for m in _YEARS_RX.finditer(blob):
+        try:
+            if int(m.group(1)) > settings.max_experience_years:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
@@ -76,7 +106,7 @@ def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
             tier_a.append(j)
         elif tier == "B":
             reason = j.get("match_reason", "")
-            if not _has_hard_gap(reason):
+            if not _has_hard_gap(reason, j.get("description", "")):
                 tier_b.append(j)
             # B with hard gap: will be sent to manual_review during apply loop
         # C: skip entirely
@@ -94,7 +124,7 @@ def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
         j for j in jobs
         if j.get("status") == "scored"
         and (j.get("match_tier") or "").upper() == "B"
-        and _has_hard_gap(j.get("match_reason", ""))
+        and _has_hard_gap(j.get("match_reason", ""), j.get("description", ""))
     ]
     print(
         f"  Tier A (auto-apply): {len(tier_a)} | "
