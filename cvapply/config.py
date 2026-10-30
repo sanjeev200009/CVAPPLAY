@@ -104,7 +104,7 @@ class Settings:
     scoring_model: str = os.getenv("SCORING_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     cover_letter_model: str = os.getenv("COVER_LETTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.2-11b-vision-instruct")
+    nvidia_model: str = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-bolt-e4b")
 
     cv_pdf_path: str = _resolve_cv_pdf_path("CV_PDF_PATH")
     cv_version_label: str = "v2"

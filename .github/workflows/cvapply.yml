@@ -40,9 +40,15 @@ jobs:
           SCORING_MODEL: ${{ vars.SCORING_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
           COVER_LETTER_MODEL: ${{ vars.COVER_LETTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
           OPENROUTER_FALLBACK_MODEL: ${{ vars.OPENROUTER_FALLBACK_MODEL || 'xingchen-agi/xing4.0-29b-a4b:free' }}
-          # NVIDIA models reached end-of-life 2026-08-26 and this account has no
-          # model access; leaving the key set costs 90s of dead retries per job.
-          NVIDIA_API_KEY: ""
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          # NVIDIA retires individual function deployments, and the account
+          # then 404s on that model only. meta/llama-3.2-11b-vision-instruct
+          # died this way mid-run; nemotron-3.5-bolt-e4b is live, ~2.9s/job,
+          # free, and unlike the 11b it fills the reason field that hard-gap
+          # detection reads. If scoring starts 404ing, try another model from
+          # https://integrate.api.nvidia.com/v1/models rather than assuming
+          # the key is dead.
+          NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL || 'nvidia/nemotron-3.5-bolt-e4b' }}
           EMAIL_APPLY_ENABLED: "1"
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
