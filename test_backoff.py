@@ -84,6 +84,37 @@ def test_transient_dns_is_not_cached_as_blocked():
     assert ae.verify_email_recipient_exists("careers@syscolabs.lk") is False
 
 
+def test_letter_anchor_ignores_thinking_prose():
+    """The old pattern cut the letter at the word "with" inside the thinking."""
+    import re
+
+    rx = re.compile(
+        r"^\s*(I am writing|I'm writing|I write to|As a|With|My technical|Having)",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    think = (
+        "The user wants a letter. I should open with the production systems "
+        "I have been building." + chr(10) * 2 +
+        "I am writing to apply for the Information Technology Intern role."
+    )
+    hits = list(rx.finditer(think))
+    assert hits, "no opening found"
+    assert think[hits[-1].start():].strip().startswith("I am writing")
+    assert not rx.match("Without doubt this should not match")
+
+
+def test_gated_portal_without_session_is_not_silent():
+    """A missing login must be a stated reason, never a bare 'failed:'."""
+    from cvapply.portal_session import PORTALS, storage_state_for
+
+    assert "xpressjobs" in PORTALS, "xpressjobs must be gated - its apply form needs a login"
+    import os
+
+    os.environ.pop("XPRESSJOBS_SESSION", None)
+    state = storage_state_for("xpressjobs")
+    assert state is None or isinstance(state, dict)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

@@ -22,3 +22,5 @@ daemon.log
 dryrun.log
 rescore.log
 *.err.log
+
+.sessions/

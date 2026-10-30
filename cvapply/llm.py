@@ -361,15 +361,21 @@ RULES:
                 f"CANDIDATE CV:\n{cv_text[:2500]}"
             )
             raw = self.chat(
-                settings.cover_letter_model, system, user, max_tokens=700, json_mode=False
+                settings.cover_letter_model, system, user, max_tokens=3000, json_mode=False
             ).strip()
 
-            # 1. Anchor directly to the beginning of the real application prose
-            match = re.search(r'\b(I am writing|I\'m writing|I write to|As a |With |My technical |Having )', raw, re.IGNORECASE)
-            if match:
-                text = raw[match.start():]
-            else:
-                text = raw
+            # 1. Anchor to the real opening. The anchor must start a line: the
+            #    old word-boundary IGNORECASE pattern matched the word "with" inside the
+            #    model's own thinking ("I should open with the production
+            #    systems...") and sliced the letter mid-sentence, yielding
+            #    "Dear Hiring Manager at X," + "with the production systems..".
+            #    Take the LAST opening -- thinking often quotes a draft first.
+            _openings = list(re.finditer(
+                r"^\s*(I am writing|I'm writing|I write to|As a\b|With\b|My technical\b|Having\b)",
+                raw,
+                re.IGNORECASE | re.MULTILINE,
+            ))
+            text = raw[_openings[-1].start():] if _openings else raw
 
             # 2. Filter out any inline labels or numbered draft bullets
             lines = text.splitlines()

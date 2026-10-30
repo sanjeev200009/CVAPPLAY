@@ -16,6 +16,7 @@ from .apply_email import derive_company_email, extract_apply_email, resolve_recr
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
 from .atss.xpressjobs import XpressJobsHandler
+from .portal_session import PORTALS, storage_state_for
 from .config import settings
 from .convex_api import ConvexClient
 from .cv import load_cv
@@ -420,9 +421,26 @@ def _apply_form(
         submitted = False
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not headed)
-            context = browser.new_context(
-                locale="en-US", viewport={"width": 1280, "height": 900}
-            )
+            ctx_args: dict[str, Any] = {
+                "locale": "en-US",
+                "viewport": {"width": 1280, "height": 900},
+            }
+            # Portals that gate the apply form behind a login need the saved
+            # session, or the page renders with no apply button at all.
+            portal = str(job.get("source") or "")
+            if portal in PORTALS:
+                state = storage_state_for(portal)
+                if state is None:
+                    browser.close()
+                    reason = (
+                        f"no saved {portal} session - run: "
+                        f"python -m cvapply.portal_session login {portal}"
+                    )
+                    print(f"  [session] {reason}")
+                    _mark_manual_review(convex, telegram, job, reason)
+                    return False
+                ctx_args["storage_state"] = state
+            context = browser.new_context(**ctx_args)
             page = context.new_page()
             handler = handler_cls(page)
             url = handler.apply_url(job)
@@ -480,8 +498,11 @@ def _apply_form(
                 return submitted
             except Exception as exc:
                 handler.screenshot(job, "error")
-                _log_application(convex, job_id, letter, "failed", str(exc), handler.payload)
-                print(f"  failed: {exc}")
+                # Playwright timeouts can stringify to "", which logged a bare
+                # "failed:" and hid the xpress.jobs login wall for weeks.
+                detail = str(exc).strip() or f"{type(exc).__name__} (no message)"
+                _log_application(convex, job_id, letter, "failed", detail, handler.payload)
+                print(f"  failed: {detail}")
                 browser.close()
                 return False
     except Exception as exc:
