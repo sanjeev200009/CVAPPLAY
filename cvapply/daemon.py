@@ -32,7 +32,12 @@ def _online() -> bool:
     return False
 
 
+_cycle_count = 0
+
+
 def run_daemon_cycle(submit: bool, app_batch_limit: int) -> None:
+    global _cycle_count
+    _cycle_count += 1
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
     if not _online():
         print(f"[{now_str}] Offline (DNS unreachable) - skipping cycle.")
@@ -51,7 +56,16 @@ def run_daemon_cycle(submit: bool, app_batch_limit: int) -> None:
     # Step 1: Sourcing & LLM Scoring
     print("\n[Stage 1/3] Sourcing new jobs & scoring...")
     try:
-        pipeline_counts = run_pipeline(dry_run=False, score=True)
+        # Global boards are saturated (8,800 fetched for ~2 new) and cost
+        # ~450s before scoring starts. Sweep them occasionally; check the Sri
+        # Lankan boards every cycle so a Colombo job is seen within minutes.
+        global_sweep = _cycle_count % settings.global_sweep_every == 0
+        if not global_sweep:
+            print("  (Sri Lankan sources only - global sweep every "
+                  f"{settings.global_sweep_every} cycles)")
+        pipeline_counts = run_pipeline(
+            dry_run=False, score=True, local_only=not global_sweep
+        )
         print(
             f"Sourcing completed: {pipeline_counts.get('fetched', 0)} fetched, "
             f"{pipeline_counts.get('new', 0)} new candidates, "

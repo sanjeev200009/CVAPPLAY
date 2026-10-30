@@ -84,11 +84,13 @@ def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[
     return above, summary, errors, tier_counts
 
 
-def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int | dict]:
+def run_pipeline(
+    dry_run: bool = False, score: bool = True, local_only: bool = False
+) -> dict[str, int | dict]:
     started = time.time()
     convex = ConvexClient()
     telegram = TelegramClient()
-    sources = build_sources()
+    sources = build_sources(local_only=local_only)
 
     counts: dict[str, int | dict] = {
         "fetched": 0, "new": 0, "duplicates": 0,

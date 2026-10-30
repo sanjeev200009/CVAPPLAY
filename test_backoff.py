@@ -147,6 +147,16 @@ def test_missing_score_raises_instead_of_writing_zero():
     assert c.score_job("t", "d", "cv")["score"] == 0
 
 
+def test_local_only_sourcing_skips_global_boards():
+    """A full sweep costs ~450s for ~2 new jobs; local-only ran in 106s."""
+    from cvapply.sources.registry import build_sources
+
+    local = build_sources(local_only=True)
+    full = build_sources()
+    assert len(local) < len(full), "local_only must drop the global boards"
+    assert len(local) >= 10, "the Sri Lankan boards must all survive"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

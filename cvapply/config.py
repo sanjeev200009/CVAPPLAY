@@ -97,6 +97,8 @@ class Settings:
     min_delay_seconds: int = int(os.getenv("MIN_DELAY", "3"))
     max_delay_seconds: int = int(os.getenv("MAX_DELAY", "8"))
     max_experience_years: int = 1
+    # Cycles between full global sweeps; every other cycle is Sri Lanka only.
+    global_sweep_every: int = int(os.getenv("GLOBAL_SWEEP_EVERY", "8"))
     only_sri_lanka: bool = os.getenv("ONLY_SRI_LANKA", "1") == "1"
 
     scoring_model: str = os.getenv("SCORING_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")

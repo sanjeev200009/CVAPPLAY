@@ -38,8 +38,15 @@ from .weworkremotely import WeWorkRemotelySource
 from .ycjobs import YCJobsSource
 
 
-def build_sources() -> list[JobSource]:
-    return [
+def build_sources(local_only: bool = False) -> list[JobSource]:
+    """Every source, or just the Sri Lankan ones.
+
+    A full sweep fetches ~8,800 listings for about 2 new jobs and costs ~450s
+    before any scoring starts -- the global remote boards are saturated. The
+    daemon runs local_only on most cycles and a full sweep occasionally, so a
+    Colombo job is seen within minutes instead of waiting out the global pass.
+    """
+    local = [
         # ── Sri Lanka local boards & Direct IT Company Hiring Emails (TOP PRIORITY) ──
         SriLankaDirectITCompanySource(),
         XpressJobsSource(),
@@ -54,6 +61,12 @@ def build_sources() -> list[JobSource]:
         LinkedInSriLankaSource(),
         IndeedLKSource(),            # NEW: Indeed Sri Lanka (JSON + Playwright fallback)
 
+    ]
+
+    if local_only:
+        return local
+
+    return local + [
         # ── Global remote boards (API / RSS — fast & reliable) ──
         GreenhouseSource(settings.greenhouse_companies),
         LeverSource(settings.lever_companies),
