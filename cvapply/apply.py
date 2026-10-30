@@ -251,6 +251,7 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> dic
 
     scores_this_run: list[float] = []
     seen_companies: set[str] = set()
+    emailed_this_run: set[str] = set()
 
     for idx, job in enumerate(candidates, start=1):
         title = job.get("title", "")
@@ -274,6 +275,13 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> dic
         )
 
         email_sent = False
+        if email_target and email_target.lower() in emailed_this_run:
+            # Aggregator listings repeat one recruiter across near-duplicate
+            # posts ("Intern Gampaha" / "Intern Gampaha 1"), so a single cycle
+            # was about to send the same person three letters.
+            print(f"  skipped: already emailed {email_target} this run")
+            email_target = None
+
         if email_target:
             print(f"  📧 Found recruiter email: {email_target} — generating custom email...")
             try:
@@ -286,6 +294,19 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> dic
                 )
                 subject = email_result["subject"]
                 body = email_result["body"]
+                if email_result.get("is_template"):
+                    # Both LLM providers were down, so this is boilerplate
+                    # identical for every job. Sending it is worse than not
+                    # applying: one dry run produced five identical letters to
+                    # the same recruiter. Retry on a later cycle instead.
+                    print("  skipped: no LLM available, refusing to send a template letter")
+                    _mark_manual_review(
+                        convex, telegram, job,
+                        "llm_unavailable: would have sent a template letter",
+                    )
+                    apply_stats["manual"] += 1
+                    continue
+                emailed_this_run.add(email_target.lower())
                 if submit:
                     send_application_email(email_target, subject, body, settings.cv_file_path)
                     _log_application(
@@ -352,6 +373,10 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> dic
                     )
                     subject = email_result["subject"]
                     body = email_result["body"]
+                    if email_result.get("is_template"):
+                        print("  skipped: no LLM available, refusing to send a template letter")
+                        apply_stats["manual"] += 1
+                        continue
                     if submit:
                         send_application_email(fallback_email, subject, body, settings.cv_file_path)
                         _log_application(

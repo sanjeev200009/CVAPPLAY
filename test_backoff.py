@@ -157,6 +157,42 @@ def test_local_only_sourcing_skips_global_boards():
     assert len(local) >= 10, "the Sri Lankan boards must all survive"
 
 
+def test_tech_title_rejects_non_technical_roles():
+    """"Trainee Office Assistant" scored 85/Tier A because bare "trainee"
+    counted as a tech signal."""
+    from cvapply.filters import TECH_TITLE_RE as R
+
+    for t in ["Trainee Office Assistant Colombo 61", "Intern Gampaha",
+              "Trainee Hr Assistant Kalutara", "Management Trainee", "Sales Associate"]:
+        assert not R.search(t), f"{t!r} should not read as a tech role"
+    for t in ["Associate Software Engineer", "Junior Python Developer",
+              "Trainee Software Engineer", "IT Support Engineer", "QA Engineer",
+              "Mern Stack Developer Intern", "Trainee Technical Officer", "IT Officer"]:
+        assert R.search(t), f"{t!r} is a real tech role and must survive"
+
+
+def test_template_letter_is_tagged_so_it_can_be_refused():
+    """With both providers down every job got the same boilerplate letter."""
+    from cvapply.llm import OpenRouterClient
+
+    c = OpenRouterClient.__new__(OpenRouterClient)
+
+    def _down(*a, **k):
+        raise RuntimeError("both providers unavailable")
+
+    c.chat = _down
+    out = c.generate_email_application(
+        company="Acme", job_title="Intern", job_desc="d", cv_text="cv", match_reason="r"
+    )
+    assert out.get("is_template") is True, "boilerplate must be flagged, not sent silently"
+
+
+def test_apply_refuses_template_and_dedupes_recipients():
+    src = open("cvapply/apply.py", encoding="utf-8").read()
+    assert 'email_result.get("is_template")' in src, "template letters must be refused"
+    assert "emailed_this_run" in src, "one recruiter must not get several letters per run"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

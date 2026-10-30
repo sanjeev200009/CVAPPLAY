@@ -411,11 +411,20 @@ RULES:
             if body_text and len(body_text) > 80:
                 header = f"Dear Hiring Manager at {company},\n\n"
                 signature = f"\n\nSincerely,\n{settings.candidate_first_name} {settings.candidate_last_name}\nEmail: {settings.email_user}\nPhone: +94 753 883 167\nPortfolio: https://sanjeev200009.github.io/Sivasuthakaran-Sanjeev-Portfolio/\nGitHub: https://github.com/sanjeev200009\nLocation: Colombo, Sri Lanka"
-                return {"subject": subject, "body": f"{header}{body_text}{signature}"}
+                return {
+                    "subject": subject,
+                    "body": f"{header}{body_text}{signature}",
+                    "is_template": False,
+                }
 
 
 
         except Exception as exc:
             print(f"  [llm] Fallback for email application: {exc}")
 
-        return {"subject": subject, "body": fallback_body}
+        # Never send the boilerplate. When both providers are down every
+        # application becomes the same letter -- five identical notes went to
+        # one recruiter in the last dry run, one of them opening "As a Junior
+        # Software Engineer" for an Office Assistant post. A caller that cannot
+        # get a real letter must skip the job, not send a template.
+        return {"subject": subject, "body": fallback_body, "is_template": True}

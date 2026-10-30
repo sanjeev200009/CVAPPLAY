@@ -25,11 +25,18 @@ BAD_TITLE_RE = re.compile(
 )
 
 # Target software, networking, IT support, systems, and tech roles
+# A title must name actual technical work. "intern", "trainee", "associate"
+# and bare "support" used to live in this list, so "Trainee Office Assistant
+# Colombo 61" and "Intern Gampaha" passed as software jobs and went on to
+# score 85/Tier A -- the scorer was rating an office job against a developer
+# CV. Seniority words qualify a tech word; they are not one.
 TECH_TITLE_RE = re.compile(
-    r"\b(software|developer|engineer|frontend|front-end|backend|back-end|fullstack|full-stack|"
-    r"web|python|react|javascript|typescript|ai|ml|data|node|api|qa|sqa|test|tester|intern|internship|"
-    r"graduate|associate|trainee|support|it support|network|networking|sysadmin|systems|system|administrator|"
-    r"helpdesk|technician|infrastructure|cyber|security|cloud|devops|linux|database|dba|technical|it|ict)\b",
+    r"\b(software|developer|development|engineer|engineering|programmer|frontend|front-end|"
+    r"backend|back-end|fullstack|full-stack|web|python|java|react|angular|vue|javascript|"
+    r"typescript|php|dotnet|ai|ml|data|node|api|qa|sqa|tester|testing|automation|"
+    r"network|networking|sysadmin|systems|system|helpdesk|help-desk|technician|"
+    r"infrastructure|cyber|security|cloud|devops|linux|database|dba|technical|it|ict|"
+    r"mern|mean|flutter|android|ios|mobile|wordpress|designer)\b",
     re.IGNORECASE,
 )
 
