@@ -16,6 +16,7 @@ except Exception:
 from .apply_email import derive_company_email, extract_apply_email, resolve_recruiter_email, send_application_email, verify_email_recipient_exists
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
+from .atss.itprolk import ITProLKHandler
 from .atss.xpressjobs import XpressJobsHandler
 from .filters import BAD_TITLE_RE, TECH_TITLE_RE
 from .portal_session import PORTALS, storage_state_for
@@ -31,6 +32,9 @@ HANDLERS: dict[str, Any] = {
     "lever": LeverHandler,
     "ashby": AshbyHandler,
     "xpressjobs": XpressJobsHandler,
+    # itpro.lk holds the best-matching jobs in the database and had no handler,
+    # so all 51 went to manual review as "no ATS handler".
+    "itpro_lk": ITProLKHandler,
 }
 
 
