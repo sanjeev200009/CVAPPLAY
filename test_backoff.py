@@ -197,12 +197,22 @@ def test_apply_gate_rechecks_title():
     """Jobs stored before the title filter was fixed still reach the apply
     stage: the scorer gave "Trainee / Junior Key Accounts Executive" a 100."""
     src = open("cvapply/apply.py", encoding="utf-8").read()
-    assert "TECH_TITLE_RE.search(j.get(" in src, "the apply gate must re-check the title"
+    assert "TECH_TITLE_RE.search" in src, "the apply gate must re-check the title"
+    assert "BAD_TITLE_RE.search" in src, "the apply gate must also honour the block list"
 
-    from cvapply.filters import TECH_TITLE_RE as R
-    assert not R.search("Trainee / Junior Key Accounts Executive")
-    assert not R.search("Trainee - Internship | Kiribathgoda/ Kegalle/ Kandy")
-    assert R.search("Intern - IT (Business Intelligence)")
+    from cvapply.filters import BAD_TITLE_RE as BAD, TECH_TITLE_RE as TECH
+
+    def passes_gate(title):
+        return bool(TECH.search(title)) and not BAD.search(title)
+
+    # these reached Tier A on score alone
+    assert not passes_gate("Trainee / Junior Key Accounts Executive")
+    assert not passes_gate("Trainee - Internship | Kiribathgoda/ Kegalle/ Kandy")
+    # matched "software" from the company blurb, but it is a sales role
+    assert not passes_gate("Junior Client Relationship Executive (Enterprise Software Solutions)")
+    assert passes_gate("Intern - IT (Business Intelligence)")
+    assert passes_gate("Virtualization Data Center Support")
+    assert passes_gate("Software Engineer")
 
 
 if __name__ == "__main__":
