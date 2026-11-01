@@ -145,8 +145,26 @@ class ITProLKHandler(AtsHandler):
         self.payload["submit_unconfirmed"] = True
         return False
 
+    def _form_is_gone(self) -> bool:
+        """The form closing is itself a confirmation.
+
+        A real application to FocalDive was logged as "submit button not
+        confirmed" because that page shows no success phrase -- the board's
+        receipt email proved it had gone through. A false negative is not
+        harmless: the job stays unapplied, so the next cycle applies again and
+        the employer gets a duplicate.
+        """
+        try:
+            return not self.detection_ok()
+        except Exception:
+            return False
+
     def _submission_detected(self) -> bool:
-        """Only a stated confirmation counts. A silent page is not a success."""
+        """A stated confirmation, or the form closing behind us."""
+        if self._form_is_gone():
+            self.payload["confirmation"] = "form closed after submit"
+            return True
+
         try:
             body = (self.page.inner_text("body") or "").lower()
         except Exception:

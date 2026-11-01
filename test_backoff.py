@@ -215,6 +215,21 @@ def test_apply_gate_rechecks_title():
     assert passes_gate("Software Engineer")
 
 
+def test_itpro_counts_a_closed_form_as_submitted():
+    """A real FocalDive application was logged "submit button not confirmed"
+    because that page prints no success phrase. The board's receipt email
+    proved it went through, and the false negative would have made the next
+    cycle apply again -- a duplicate to the same employer."""
+    from cvapply.atss.itprolk import ITProLKHandler
+
+    h = ITProLKHandler.__new__(ITProLKHandler)
+    h.payload = {}
+    h.detection_ok = lambda: False          # form closed after submit
+    h.page = None                            # _submission_detected must not need it
+    assert h._submission_detected() is True
+    assert h.payload["confirmation"] == "form closed after submit"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
