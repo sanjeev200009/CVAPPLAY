@@ -12,3 +12,15 @@ scratch/
 *.log
 
 .env.local
+
+# runtime state (Convex is authoritative)
+.bounced_emails.json
+.telegram_offset.json
+.seen_reply_ids.json
+.freebuff/
+daemon.log
+dryrun.log
+rescore.log
+*.err.log
+
+.sessions/

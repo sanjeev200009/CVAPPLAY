@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+import re
 import time
 from typing import Any
 
@@ -16,6 +17,8 @@ from .apply_email import derive_company_email, extract_apply_email, resolve_recr
 
 from .atss.greenhouse import AshbyHandler, GreenhouseHandler, LeverHandler
 from .atss.xpressjobs import XpressJobsHandler
+from .filters import TECH_TITLE_RE
+from .portal_session import PORTALS, storage_state_for
 from .config import settings
 from .convex_api import ConvexClient
 from .cv import load_cv
@@ -38,18 +41,155 @@ def _daily_applied_count(convex: ConvexClient) -> int:
     return sum(1 for d in docs if d.get("submission_status") == "success")
 
 
+# Captures the LOWER bound of an experience demand. A range means the floor is
+# the requirement: "0-2 years" welcomes a fresh graduate, so reading the 2 and
+# rejecting the job was backwards.
+_YEARS_RX = re.compile(
+    r"(\d{1,2})\s*(?:(?:-|–|to)\s*(\d{1,2}))?\s*\+?\s*year",
+    re.IGNORECASE,
+)
+
+
+def _has_hard_gap(match_reason: str, description: str = "") -> bool:
+    """True if the posting states a requirement the candidate cannot meet.
+
+    The keyword list ("5+ years", "requires certification") describes wording
+    found in JOB DESCRIPTIONS, not in a model's one-line reason -- and the
+    scoring model often returns reason: "" entirely, which silently disabled
+    this check and auto-applied to roles demanding years of experience. So read
+    the description too, and treat a stated experience requirement above the
+    candidate's level as a hard gap on its own.
+    """
+    blob = f"{match_reason or ''}" + chr(10) + f"{description or ''}"
+    blob = blob.lower()
+    if any(kw.lower() in blob for kw in settings.tier_b_hard_gap_keywords):
+        return True
+
+    # A numeric experience demand is the most common real disqualifier and the
+    # one keyword matching misses ("minimum 4 years", "at least 3 years").
+    for m in _YEARS_RX.finditer(blob):
+        try:
+            if int(m.group(1)) > settings.max_experience_years:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def _pick_candidates(convex: ConvexClient, limit: int) -> list[dict]:
+    """
+    Returns candidates sorted by A-tier → B-tier (no hard gap), then by:
+    1. Sri Lanka location tier first
+    2. Highest match score
+    Tier C jobs and B-tier jobs with hard gaps are excluded.
+    """
     jobs = convex.query("queries:scoredJobs", {"limit": 500}) or []
-    candidates = [
-        j
-        for j in jobs
-        if j.get("status") == "scored"               # only ready jobs
-        and j.get("status") != "ats_only"            # never re-attempt ATS portal-only companies via email
-        and (j.get("match_score") or 0) >= settings.match_threshold
+
+    tier_a: list[dict] = []
+    tier_b: list[dict] = []
+    skipped_non_tech: list[str] = []
+
+    for j in jobs:
+        if j.get("status") != "scored":
+            continue
+        # The title filter runs at sourcing time, so jobs stored before it was
+        # corrected are still in here -- and the scorer rated "Trainee / Junior
+        # Key Accounts Executive" at 100. Re-check at the gate that actually
+        # sends, so a high score can never carry a non-technical role through.
+        if not TECH_TITLE_RE.search(j.get("title") or ""):
+            skipped_non_tech.append(j.get("title") or "?")
+            continue
+        score = j.get("match_score") or 0
+        tier = (j.get("match_tier") or "").upper()
+
+        # Derive tier from score if not stored (backwards compat)
+        if tier not in ("A", "B", "C"):
+            if score >= 75:
+                tier = "A"
+            elif score >= 50:
+                tier = "B"
+            else:
+                tier = "C"
+
+        if tier == "A":
+            tier_a.append(j)
+        elif tier == "B":
+            reason = j.get("match_reason", "")
+            if not _has_hard_gap(reason, j.get("description", "")):
+                tier_b.append(j)
+            # B with hard gap: will be sent to manual_review during apply loop
+        # C: skip entirely
+
+    # Sort each group: Sri Lanka first, then by descending score
+    def sort_key(j: dict) -> tuple:
+        return (0 if j.get("location_tier") == "sri_lanka" else 1, -(j.get("match_score") or 0))
+
+    tier_a.sort(key=sort_key)
+    tier_b.sort(key=sort_key)
+
+    # Log tier distribution
+    all_c = [j for j in jobs if j.get("status") == "scored" and (j.get("match_tier") or "C").upper() == "C"]
+    hard_gap_b = [
+        j for j in jobs
+        if j.get("status") == "scored"
+        and (j.get("match_tier") or "").upper() == "B"
+        and _has_hard_gap(j.get("match_reason", ""), j.get("description", ""))
     ]
-    # Prioritize Sri Lanka location tier first, then highest match score
-    candidates.sort(key=lambda j: (0 if j.get("location_tier") == "sri_lanka" else 1, -(j.get("match_score") or 0)))
-    return candidates[:limit]
+    if skipped_non_tech:
+        print(f"  Skipped {len(skipped_non_tech)} non-technical title(s), e.g. "
+              f"{'; '.join(skipped_non_tech[:3])}")
+    print(
+        f"  Tier A (auto-apply): {len(tier_a)} | "
+        f"Tier B (caution): {len(tier_b)} | "
+        f"Tier B hard-gap (→ manual): {len(hard_gap_b)} | "
+        f"Tier C (skipped): {len(all_c)}"
+    )
+
+    candidates = (tier_a + tier_b)[:limit]
+    return candidates
+
+
+def _mark_manual_review(
+    convex: ConvexClient,
+    telegram: TelegramClient,
+    job: dict,
+    reason: str,
+) -> None:
+    """Flag a job as requiring manual human action and alert via Telegram."""
+    job_id = job.get("_id")
+    if not job_id:
+        return
+    try:
+        convex.mutation(
+            "mutations:updateJob",
+            {
+                "job_id": job_id,
+                "status": "manual_review",
+                "manual_review_reason": reason[:500],
+            },
+        )
+    except Exception as exc:
+        print(f"  [manual_review] failed to update Convex: {exc}")
+
+    company = job.get("company", "Unknown")
+    title = job.get("title", "Unknown")
+    score = job.get("match_score", 0)
+    tier = (job.get("match_tier") or "?").upper()
+    apply_url = job.get("apply_url", "")
+
+    msg = (
+        f"🔔 Manual Review Required\n\n"
+        f"🏢 Company: {company}\n"
+        f"💼 Role: {title}\n"
+        f"🎯 Score: {score}/100 (Tier {tier})\n"
+        f"⚠️ Reason: {reason[:200]}\n"
+        f"🔗 URL: {apply_url}"
+    )
+    try:
+        telegram.send_message(msg)
+    except Exception:
+        pass
+    print(f"  🔔 Manual review flagged: {reason[:100]}")
 
 
 
@@ -86,7 +226,11 @@ def _log_application(
     )
 
 
-def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> None:
+def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> dict[str, Any]:
+    """
+    Returns apply_stats dict with keys:
+    submitted, manual, failed, avg_score, best_opportunities, new_companies, errors.
+    """
     convex = ConvexClient()
     telegram = TelegramClient()
     llm = OpenRouterClient()
@@ -96,9 +240,14 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
     if job_id:
         candidates = [j for j in candidates if j.get("_id") == job_id]
 
+    apply_stats: dict[str, Any] = {
+        "submitted": 0, "manual": 0, "failed": 0,
+        "avg_score": 0.0, "best_opportunities": [], "new_companies": [], "errors": [],
+    }
+
     if not candidates:
         print("no candidates above threshold")
-        return
+        return apply_stats
 
     applied_today = _daily_applied_count(convex)
     remaining = settings.daily_app_cap - applied_today
@@ -106,31 +255,46 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
     if remaining <= 0:
         print("daily cap reached - stopping")
         telegram.send_message("🚫 Daily application cap reached - stopping.")
-        return
+        return apply_stats
     candidates = candidates[:remaining]
 
     if submit:
         print(f"⚠️  SUBMIT MODE: {len(candidates)} real applications will be sent")
+
+    scores_this_run: list[float] = []
+    seen_companies: set[str] = set()
+    emailed_this_run: set[str] = set()
 
     for idx, job in enumerate(candidates, start=1):
         title = job.get("title", "")
         company = job.get("company", "")
         score = job.get("match_score", 0)
         match_reason = job.get("match_reason", "")
-        print(f"\n[{idx}/{len(candidates)}] {company} — {title} (score {score})")
+        tier = (job.get("match_tier") or "B").upper()
+        print(f"\n[{idx}/{len(candidates)}] [{tier}] {company} — {title} (score {score})")
 
-        job_id = job.get("_id")
+        job_id_current = job.get("_id")
+        scores_this_run.append(float(score))
+        if company and company not in seen_companies:
+            seen_companies.add(company)
+            apply_stats["new_companies"].append(company)
 
         # ── Stage 1: EMAIL APPLICATION (PRIMARY CHANNEL — always attempted) ──
-        # 3-Tier Cascade: (1) Scan JD for email → (2) Master 60+ LK IT Directory → (3) Domain inference + SMTP
         email_target = resolve_recruiter_email(
             company,
             job.get("description", ""),
             job.get("apply_url", ""),
         )
 
-        if email_target:
+        email_sent = False
+        if email_target and email_target.lower() in emailed_this_run:
+            # Aggregator listings repeat one recruiter across near-duplicate
+            # posts ("Intern Gampaha" / "Intern Gampaha 1"), so a single cycle
+            # was about to send the same person three letters.
+            print(f"  skipped: already emailed {email_target} this run")
+            email_target = None
 
+        if email_target:
             print(f"  📧 Found recruiter email: {email_target} — generating custom email...")
             try:
                 email_result = llm.generate_email_application(
@@ -142,27 +306,45 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
                 )
                 subject = email_result["subject"]
                 body = email_result["body"]
+                if email_result.get("is_template"):
+                    # Both LLM providers were down, so this is boilerplate
+                    # identical for every job. Sending it is worse than not
+                    # applying: one dry run produced five identical letters to
+                    # the same recruiter. Retry on a later cycle instead.
+                    print("  skipped: no LLM available, refusing to send a template letter")
+                    _mark_manual_review(
+                        convex, telegram, job,
+                        "llm_unavailable: would have sent a template letter",
+                    )
+                    apply_stats["manual"] += 1
+                    continue
+                emailed_this_run.add(email_target.lower())
                 if submit:
                     send_application_email(email_target, subject, body, settings.cv_file_path)
                     _log_application(
-                        convex, job_id, body, "success", None,
+                        convex, job_id_current, body, "success", None,
                         {"channel": "email", "to": email_target, "subject": subject},
                     )
                     msg = _format_telegram_msg("📧", f"EMAIL SENT → {email_target}", job, score)
                     telegram.send_message(msg)
                     print(f"  ✅ Email sent to {email_target}")
+                    apply_stats["submitted"] += 1
+                    apply_stats["best_opportunities"].append(f"{company} — {title} (score {score}, Tier {tier})")
+                    email_sent = True
                 else:
                     print(f"  [dry-run] Would email: {email_target}")
                     print(f"  Subject: {subject}")
                     print(f"  Body preview: {body[:200]}...")
+                    email_sent = True
             except ValueError as exc:
                 print(f"  ℹ️  Skipped unverified email ({email_target}) to prevent 550 bounce: {exc}")
             except Exception as exc:
-                _log_application(convex, job_id, "", "failed", str(exc)[:300], {"channel": "email", "to": email_target})
+                _log_application(convex, job_id_current, "", "failed", str(exc)[:300], {"channel": "email", "to": email_target})
                 msg = _format_telegram_msg("❌", f"EMAIL FAILED ({email_target})", job, score, extra_error=str(exc))
                 telegram.send_message(msg)
                 print(f"  ❌ Email failed: {exc}")
-
+                apply_stats["failed"] += 1
+                apply_stats["errors"].append(f"{company}/{title}: email failed: {str(exc)[:100]}")
         else:
             print(f"  ℹ️  No recruiter email found — will apply via web portal only")
 
@@ -176,13 +358,22 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
                 print(f"  cover letter for web form failed: {exc}")
                 letter = ""
             if letter:
-                web_submitted = _apply_form(convex, telegram, handler_cls, job, letter, submit, headed)
+                web_submitted = _apply_form(
+                    convex, telegram, handler_cls, job, letter, submit, headed
+                )
+                if web_submitted and submit:
+                    apply_stats["submitted"] += 1
+                    if not email_sent:
+                        apply_stats["best_opportunities"].append(
+                            f"{company} — {title} (score {score}, Tier {tier})"
+                        )
+                elif not web_submitted and submit and handler_cls is not None:
+                    apply_stats["failed"] += 1
 
         # ── Stage 3: EMAIL FALLBACK (IF WEB PORTAL FAILED & NO EMAIL SENT YET) ──
-        if not email_target and not web_submitted and settings.email_enabled:
+        if not email_sent and not web_submitted and settings.email_enabled:
             fallback_email = derive_company_email(company, job.get("apply_url", ""))
             if fallback_email and verify_email_recipient_exists(fallback_email):
-
                 print(f"  📧 Web portal unavailable/failed. Sending fallback application email to {fallback_email}...")
                 try:
                     email_result = llm.generate_email_application(
@@ -194,25 +385,55 @@ def run_apply(submit: bool, limit: int, job_id: str | None, headed: bool) -> Non
                     )
                     subject = email_result["subject"]
                     body = email_result["body"]
+                    if email_result.get("is_template"):
+                        print("  skipped: no LLM available, refusing to send a template letter")
+                        apply_stats["manual"] += 1
+                        continue
                     if submit:
                         send_application_email(fallback_email, subject, body, settings.cv_file_path)
                         _log_application(
-                            convex, job_id, body, "success", None,
+                            convex, job_id_current, body, "success", None,
                             {"channel": "email_fallback", "to": fallback_email, "subject": subject},
                         )
                         msg = _format_telegram_msg("📧", f"FALLBACK EMAIL SENT → {fallback_email}", job, score)
                         telegram.send_message(msg)
                         print(f"  ✅ Fallback application email sent to {fallback_email}")
+                        apply_stats["submitted"] += 1
+                        apply_stats["best_opportunities"].append(
+                            f"{company} — {title} (score {score}, Tier {tier})"
+                        )
                     else:
                         print(f"  [dry-run] Would send fallback email to: {fallback_email}")
                 except Exception as exc:
                     print(f"  Fallback email error: {exc}")
+                    apply_stats["failed"] += 1
+            else:
+                # All 3 channels exhausted — flag for manual review
+                if submit:
+                    _mark_manual_review(
+                        convex, telegram, job,
+                        "all_channels_failed: no email found, no ATS handler, no fallback domain"
+                    )
+                    apply_stats["manual"] += 1
 
         if idx < len(candidates):
             delay = random.uniform(settings.min_delay_seconds, settings.max_delay_seconds)
-
             print(f"  waiting {delay:.0f}s...")
             time.sleep(delay)
+
+    # Finalise stats
+    if scores_this_run:
+        apply_stats["avg_score"] = round(sum(scores_this_run) / len(scores_this_run), 1)
+    # Deduplicate best_opportunities
+    seen_bests: set[str] = set()
+    unique_bests: list[str] = []
+    for b in apply_stats["best_opportunities"]:
+        if b not in seen_bests:
+            seen_bests.add(b)
+            unique_bests.append(b)
+    apply_stats["best_opportunities"] = unique_bests[:10]
+
+    return apply_stats
 
 
 
@@ -267,9 +488,26 @@ def _apply_form(
         submitted = False
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not headed)
-            context = browser.new_context(
-                locale="en-US", viewport={"width": 1280, "height": 900}
-            )
+            ctx_args: dict[str, Any] = {
+                "locale": "en-US",
+                "viewport": {"width": 1280, "height": 900},
+            }
+            # Portals that gate the apply form behind a login need the saved
+            # session, or the page renders with no apply button at all.
+            portal = str(job.get("source") or "")
+            if portal in PORTALS:
+                state = storage_state_for(portal)
+                if state is None:
+                    browser.close()
+                    reason = (
+                        f"no saved {portal} session - run: "
+                        f"python -m cvapply.portal_session login {portal}"
+                    )
+                    print(f"  [session] {reason}")
+                    _mark_manual_review(convex, telegram, job, reason)
+                    return False
+                ctx_args["storage_state"] = state
+            context = browser.new_context(**ctx_args)
             page = context.new_page()
             handler = handler_cls(page)
             url = handler.apply_url(job)
@@ -277,8 +515,23 @@ def _apply_form(
             try:
                 page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 handler.prepare_page()
+
+                # ── CAPTCHA / OTP / block detection ──
+                if page.locator('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], div.g-recaptcha').count() > 0:
+                    browser.close()
+                    _mark_manual_review(convex, telegram, job, "captcha_detected on ATS form")
+                    return False
+
+                if "verify" in page.url.lower() or "challenge" in page.url.lower():
+                    browser.close()
+                    _mark_manual_review(convex, telegram, job, f"verification_redirect: {page.url[:120]}")
+                    return False
+
                 if not handler.detection_ok():
-                    raise RuntimeError("ATS form not detected on page")
+                    browser.close()
+                    _mark_manual_review(convex, telegram, job, "ats_form_not_detected")
+                    return False
+
                 handler.fill_known_fields(job, letter)
                 handler.screenshot(job, "filled")
                 if not submit:
@@ -312,15 +565,16 @@ def _apply_form(
                 return submitted
             except Exception as exc:
                 handler.screenshot(job, "error")
-                _log_application(convex, job_id, letter, "failed", str(exc), handler.payload)
-                print(f"  failed: {exc}")
+                # Playwright timeouts can stringify to "", which logged a bare
+                # "failed:" and hid the xpress.jobs login wall for weeks.
+                detail = str(exc).strip() or f"{type(exc).__name__} (no message)"
+                _log_application(convex, job_id, letter, "failed", detail, handler.payload)
+                print(f"  failed: {detail}")
                 browser.close()
                 return False
     except Exception as exc:
         print(f"  ℹ️ Web portal auto-fill unavailable for {company}: {exc}")
         return False
-
-
 
 
 def main() -> None:
@@ -330,7 +584,8 @@ def main() -> None:
     parser.add_argument("--job", type=str, default=None, help="apply only this Convex job id")
     parser.add_argument("--headed", action="store_true", help="show the browser window")
     args = parser.parse_args()
-    run_apply(submit=args.submit, limit=args.limit, job_id=args.job, headed=args.headed)
+    stats = run_apply(submit=args.submit, limit=args.limit, job_id=args.job, headed=args.headed)
+    print(f"\nApply run complete: submitted={stats['submitted']} manual={stats['manual']} failed={stats['failed']}")
 
 
 if __name__ == "__main__":

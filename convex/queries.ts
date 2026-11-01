@@ -73,11 +73,51 @@ export const scoredJobs = query({
   },
 });
 
-
 export const applicationsSince = query({
   args: { since: v.number() },
   handler: async (ctx, { since }) => {
     const apps = await ctx.db.query("applications").collect();
     return apps.filter((app) => (app.submitted_at ?? 0) >= since);
+  },
+});
+
+export const manualReviewJobs = query({
+  args: { limit: v.number() },
+  handler: async (ctx, { limit }) => {
+    return await ctx.db
+      .query("jobs")
+      .withIndex("by_status", (q) => q.eq("status", "manual_review"))
+      .order("desc")
+      .take(Math.min(limit, 50));
+  },
+});
+
+export const errorJobs = query({
+  args: { limit: v.number() },
+  handler: async (ctx, { limit }) => {
+    return await ctx.db
+      .query("jobs")
+      .withIndex("by_status", (q) => q.eq("status", "error"))
+      .order("desc")
+      .take(Math.min(limit, 500));
+  },
+});
+
+export const recentReports = query({
+  args: { limit: v.number() },
+  handler: async (ctx, { limit }) => {
+    return await ctx.db
+      .query("daily_reports")
+      .withIndex("by_run_at")
+      .order("desc")
+      .take(Math.min(limit, 30));
+  },
+});
+
+export const deadEmails = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("dead_emails").collect();
+    return rows.map((r) => r.address);
   },
 });

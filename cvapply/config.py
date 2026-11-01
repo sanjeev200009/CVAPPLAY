@@ -37,6 +37,37 @@ REMOTIVE_CATEGORIES: list[str] = [
     "qa", "security",
 ]
 
+# Canonical role-title search variants — used by all keyword-based sources
+SEARCH_TITLES: list[str] = [
+    "software engineer",
+    "full-stack developer",
+    "frontend developer",
+    "backend developer",
+    "react developer",
+    "next.js developer",
+    "node.js developer",
+    "ai engineer",
+    "ai software engineer",
+    "associate software engineer",
+    "junior software engineer",
+    "product engineer",
+    "ai product engineer",
+    "software developer",
+]
+
+# B-tier hard-gap keywords: if present in match_reason, route to manual review
+TIER_B_HARD_GAP_KEYWORDS: list[str] = [
+    "missing mandatory",
+    "requires certification",
+    "requires clearance",
+    "requires degree in",
+    "requires specific",
+    "5+ years",
+    "4+ years",
+    "3+ years",
+    "2+ years",
+]
+
 
 def _resolve_cv_pdf_path(env_var: str = "CV_PDF_PATH") -> str:
     env_path = os.getenv(env_var, "")
@@ -66,12 +97,14 @@ class Settings:
     min_delay_seconds: int = int(os.getenv("MIN_DELAY", "3"))
     max_delay_seconds: int = int(os.getenv("MAX_DELAY", "8"))
     max_experience_years: int = 1
+    # Cycles between full global sweeps; every other cycle is Sri Lanka only.
+    global_sweep_every: int = int(os.getenv("GLOBAL_SWEEP_EVERY", "8"))
     only_sri_lanka: bool = os.getenv("ONLY_SRI_LANKA", "1") == "1"
 
-    scoring_model: str = "google/gemini-2.5-flash"
-    cover_letter_model: str = "openai/gpt-4o-mini"
+    scoring_model: str = os.getenv("SCORING_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+    cover_letter_model: str = os.getenv("COVER_LETTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    nvidia_model: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+    nvidia_model: str = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-bolt-e4b")
 
     cv_pdf_path: str = _resolve_cv_pdf_path("CV_PDF_PATH")
     cv_version_label: str = "v2"
@@ -112,6 +145,11 @@ class Settings:
     lever_companies: list[str] = field(default_factory=lambda: LEVER_COMPANIES)
     ashby_companies: list[str] = field(default_factory=lambda: ASHBY_COMPANIES)
     remotive_categories: list[str] = field(default_factory=lambda: REMOTIVE_CATEGORIES)
+    search_titles: list[str] = field(default_factory=lambda: SEARCH_TITLES)
+    tier_b_hard_gap_keywords: list[str] = field(default_factory=lambda: TIER_B_HARD_GAP_KEYWORDS)
+
+    # OpenRouter fallback (used when NVIDIA NIM is unavailable)
+    openrouter_fallback_model: str = os.getenv("OPENROUTER_FALLBACK_MODEL", "nvidia/nemotron-3.5-lightning:free")
 
 
 settings = Settings()

@@ -8,6 +8,8 @@ const jobStatus = v.union(
   v.literal("applied"),
   v.literal("skipped"),
   v.literal("error"),
+  v.literal("manual_review"),
+  v.literal("invalid"),
 );
 
 export const upsertJob = mutation({
@@ -47,17 +49,29 @@ export const updateJob = mutation({
     job_id: v.id("jobs"),
     status: v.optional(jobStatus),
     match_score: v.optional(v.number()),
+    match_tier: v.optional(v.string()),
     match_reason: v.optional(v.string()),
     salary: v.optional(v.string()),
     summary: v.optional(v.string()),
+    manual_review_reason: v.optional(v.string()),
+    clear_score: v.optional(v.boolean()),
   },
-  handler: async (ctx, { job_id, status, match_score, match_reason, salary, summary }) => {
+  handler: async (ctx, { job_id, status, match_score, match_tier, match_reason, salary, summary, manual_review_reason, clear_score }) => {
     const patch: Record<string, unknown> = {};
     if (status !== undefined) patch.status = status;
     if (match_score !== undefined) patch.match_score = match_score;
+    if (match_tier !== undefined) patch.match_tier = match_tier;
     if (match_reason !== undefined) patch.match_reason = match_reason;
     if (salary !== undefined) patch.salary = salary;
     if (summary !== undefined) patch.summary = summary;
+    if (manual_review_reason !== undefined) patch.manual_review_reason = manual_review_reason;
+    // Reset back to unscored: pendingScoring re-picks jobs whose match_score
+    // is undefined, so a plain re-queue must actually remove the field.
+    if (clear_score) {
+      patch.match_score = undefined;
+      patch.match_tier = undefined;
+      patch.match_reason = undefined;
+    }
     await ctx.db.patch(job_id, patch);
   },
 });
@@ -103,6 +117,30 @@ export const insertResumeVersion = mutation({
   },
 });
 
+export const insertDailyReport = mutation({
+  args: {
+    run_at: v.number(),
+    jobs_found: v.number(),
+    jobs_filtered: v.number(),
+    jobs_invalid: v.number(),
+    jobs_relevant: v.number(),
+    tier_a_count: v.number(),
+    tier_b_count: v.number(),
+    tier_c_count: v.number(),
+    applications_submitted: v.number(),
+    applications_manual: v.number(),
+    applications_failed: v.number(),
+    avg_match_score: v.number(),
+    new_companies: v.array(v.string()),
+    best_opportunities: v.array(v.string()),
+    source_breakdown: v.optional(v.any()),
+    problems: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("daily_reports", args);
+  },
+});
+
 export const clearAllJobs = mutation({
   args: {},
   handler: async (ctx) => {
@@ -130,5 +168,28 @@ export const resetScoring = mutation({
       }
     }
     return n;
+  },
+});
+
+export const markDeadEmail = mutation({
+  args: {
+    address: v.string(),
+    reason: v.optional(v.string()),
+    source: v.optional(v.string()),
+  },
+  handler: async (ctx, { address, reason, source }) => {
+    const addr = address.toLowerCase().trim();
+    const existing = await ctx.db
+      .query("dead_emails")
+      .withIndex("by_address", (q) => q.eq("address", addr))
+      .first();
+    if (existing) return false;
+    await ctx.db.insert("dead_emails", {
+      address: addr,
+      reason,
+      source,
+      first_seen: Date.now(),
+    });
+    return true;
   },
 });

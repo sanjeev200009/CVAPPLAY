@@ -22,17 +22,20 @@ from .sources.base import Job
 from .sources.registry import build_sources
 from .store import insert_log, upsert_job
 from .telegram import TelegramClient
+from .validator import validate_job
 
 
-def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[str]]:
-    """Score jobs with status=new and no match_score yet."""
+def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[str], dict[str, int]]:
+    """Score jobs with status=new and no match_score yet.
+    Returns (above_threshold, top_summary, errors, tier_counts).
+    """
     jobs = convex.query("queries:pendingScoring", {"limit": 60}) or []
     if not jobs:
-        return 0, [], []
+        return 0, [], [], {}
     cv_text = load_cv()
     llm = OpenRouterClient()
     lock = threading.Lock()
-    results: list[tuple[int, int, str]] = []
+    results: list[tuple[int, str, str, str]] = []  # (score, tier, job_id, label)
     errors: list[str] = []
 
     def _score(job: dict) -> None:
@@ -47,6 +50,7 @@ def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[
                     "job_id": job["_id"],
                     "status": "scored",
                     "match_score": data["score"],
+                    "match_tier": data.get("match_tier", "C"),
                     "match_reason": data.get("reason", ""),
                     "salary": data.get("salary", "Not specified"),
                     "summary": data.get("summary", ""),
@@ -54,7 +58,12 @@ def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[
             )
 
             with lock:
-                results.append((data["score"], job["_id"], job.get("company", ""), job.get("title", "")))
+                results.append((
+                    data["score"],
+                    data.get("match_tier", "C"),
+                    job["_id"],
+                    f"{job.get('company', '')} — {job.get('title', '')}",
+                ))
         except Exception as exc:
             with lock:
                 errors.append(f"score {job.get('company')}/{job.get('title')}: {exc}")
@@ -66,43 +75,62 @@ def run_scoring(convex: ConvexClient) -> tuple[int, list[tuple[int, str]], list[
 
     above = sum(1 for r in results if r[0] >= settings.match_threshold)
     top = sorted(results, key=lambda r: -r[0])[:3]
-    summary = [
-        (score, f"{company} — {title}")
-        for score, _job_id, company, title in top
-    ]
-    return above, summary, errors
+    summary = [(score, label) for score, _tier, _jid, label in top]
+
+    tier_counts: dict[str, int] = {"A": 0, "B": 0, "C": 0}
+    for _, tier, _, _ in results:
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+    return above, summary, errors, tier_counts
 
 
-def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
+def run_pipeline(
+    dry_run: bool = False, score: bool = True, local_only: bool = False
+) -> dict[str, int | dict]:
     started = time.time()
     convex = ConvexClient()
     telegram = TelegramClient()
-    sources = build_sources()
+    sources = build_sources(local_only=local_only)
 
-    counts = {"fetched": 0, "new": 0, "duplicates": 0, "filtered": 0, "errors": 0}
+    counts: dict[str, int | dict] = {
+        "fetched": 0, "new": 0, "duplicates": 0,
+        "filtered": 0, "invalid": 0, "errors": 0,
+    }
     tier_counts: dict[str, int] = {}
     errors: list[str] = []
     kept_examples: list[str] = []
     example_lock = threading.Lock()
     kept_jobs: list[Job] = []
+    source_breakdown: dict[str, int] = {}
 
     for source in sources:
         jobs = source.fetch()
         errors.extend(source.errors)
-        counts["fetched"] += len(jobs)
+        counts["fetched"] = int(counts["fetched"]) + len(jobs)
+        source_breakdown[source.name] = source_breakdown.get(source.name, 0) + len(jobs)
+
         for job in jobs:
+            # ── Validation layer (scam / stale / suspicious) ──
+            is_valid, invalid_reason = validate_job(job)
+            if not is_valid:
+                counts["invalid"] = int(counts["invalid"]) + 1
+                continue
+
+            # ── Location / title / experience filter ──
             keep, reason, tier = filter_job(job)
             tier_counts[tier] = tier_counts.get(tier, 0) + 1
             if not keep:
-                counts["filtered"] += 1
+                counts["filtered"] = int(counts["filtered"]) + 1
                 continue
             kept_jobs.append(job)
+
+    counts["source_breakdown"] = source_breakdown  # type: ignore[assignment]
 
     if dry_run:
         counts["new"] = len(kept_jobs)
         print(
-            "dry run: fetched=%d filtered=%d kept=%d"
-            % (counts["fetched"], counts["filtered"], counts["new"])
+            "dry run: fetched=%d invalid=%d filtered=%d kept=%d"
+            % (counts["fetched"], counts["invalid"], counts["filtered"], counts["new"])
         )
         for job in kept_jobs[:20]:
             print(f"  • {job.company} — {job.title} ({job.location})")
@@ -124,13 +152,13 @@ def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
         for future in as_completed(futures):
             job, result = future.result()
             if isinstance(result, str):
-                counts["errors"] += 1
+                counts["errors"] = int(counts["errors"]) + 1
                 errors.append(result)
                 continue
             if result:
-                counts["new"] += 1
+                counts["new"] = int(counts["new"]) + 1
             else:
-                counts["duplicates"] += 1
+                counts["duplicates"] = int(counts["duplicates"]) + 1
             with example_lock:
                 kept_examples.append(f"• {job.company} — {job.title} ({job.location})")
 
@@ -138,12 +166,17 @@ def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
 
     scored_above = 0
     score_summary: list[tuple[int, str]] = []
+    score_tier_counts: dict[str, int] = {}
     if score and not dry_run:
         try:
-            scored_above, score_summary, score_errors = run_scoring(convex)
+            scored_above, score_summary, score_errors, score_tier_counts = run_scoring(convex)
             errors.extend(score_errors)
         except Exception as exc:
             print(f"[scoring] failed: {exc}")
+
+    counts["tier_a"] = score_tier_counts.get("A", 0)
+    counts["tier_b"] = score_tier_counts.get("B", 0)
+    counts["tier_c"] = score_tier_counts.get("C", 0)
 
     try:
         for err in errors[:50]:
@@ -154,7 +187,7 @@ def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
             convex,
             "info",
             "pipeline_run",
-            {"counts": counts},
+            {"counts": {k: v for k, v in counts.items() if k != "source_breakdown"}},
         )
     except Exception as exc:
         print(f"[log] failed to write logs: {exc}")
@@ -163,6 +196,7 @@ def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
         "🤖 CV Apply — pipeline run (🇱🇰 Sri Lanka focus)",
         "",
         f"Fetched: {counts['fetched']}",
+        f"Invalid/scam dropped: {counts['invalid']}",
         f"Filtered out: {counts['filtered']}",
         f"New candidates: {counts['new']}",
         f"Already known: {counts['duplicates']}",
@@ -174,6 +208,11 @@ def run_pipeline(dry_run: bool = False, score: bool = True) -> dict[str, int]:
         f"  • Worldwide remote: {tier_counts.get('worldwide', 0)}",
         f"  • Region-restricted (dropped): {tier_counts.get('restricted_remote', 0)}",
         f"  • Onsite (dropped): {tier_counts.get('onsite', 0)}",
+        "",
+        f"Match tiers (scored this run):",
+        f"  • Tier A (≥75): {score_tier_counts.get('A', 0)}",
+        f"  • Tier B (50-74): {score_tier_counts.get('B', 0)}",
+        f"  • Tier C (<50): {score_tier_counts.get('C', 0)}",
         "",
         f"LLM scoring: {scored_above} above threshold {settings.match_threshold}",
     ]
@@ -197,5 +236,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CV Apply pipeline")
     parser.add_argument("--dry-run", action="store_true", help="fetch + filter but skip Convex/Telegram")
     parser.add_argument("--no-score", action="store_true", help="skip LLM scoring step")
+    parser.add_argument("--telegram-listen", action="store_true", help="run Telegram instant job application listener")
+    parser.add_argument("--submit", action="store_true", help="submit real emails when using telegram-listen")
     args = parser.parse_args()
-    run_pipeline(dry_run=args.dry_run, score=not args.no_score)
+
+    if args.telegram_listen:
+        from .telegram_listener import TelegramListener
+        listener = TelegramListener(submit=args.submit)
+        listener.listen_loop()
+    else:
+        run_pipeline(dry_run=args.dry_run, score=not args.no_score)

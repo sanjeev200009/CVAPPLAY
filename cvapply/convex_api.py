@@ -9,6 +9,14 @@ from requests import Response
 from .config import settings
 
 
+class ConvexError(RuntimeError):
+    """Application-level error returned by a Convex function (status == 'error').
+
+    Distinct from transport errors so callers can tell a deterministic
+    validation/logic failure apart from a transient network blip.
+    """
+
+
 class ConvexClient:
     def __init__(self) -> None:
         self.url = settings.convex_deploy_url.rstrip("/")
@@ -34,10 +42,21 @@ class ConvexClient:
                     raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
                 data = resp.json()
                 if data.get("status") == "error":
-                    raise RuntimeError(
-                        f"Convex {kind} '{path}' error: {data.get('code')} {data.get('message')}"
+                    # Convex REST returns the failure text in `errorMessage`
+                    # (with optional `errorData`), NOT `code`/`message`.
+                    msg = (
+                        data.get("errorMessage")
+                        or data.get("message")
+                        or str(data.get("errorData"))
+                        or "unknown error"
                     )
+                    raise ConvexError(f"Convex {kind} '{path}' error: {msg}")
                 return data.get("value")
+            except ConvexError:
+                # Application-level validation/logic errors are deterministic —
+                # retrying sends the identical payload and fails identically.
+                # Fail fast so the real message surfaces instead of being buried.
+                raise
             except (requests.RequestException, RuntimeError) as exc:
                 last_exc = exc
                 time.sleep(min(2 ** attempt, 10))
