@@ -20,7 +20,11 @@ BAD_TITLE_RE = re.compile(
     r"academy of achievement|beekeeper|service professional|detail specialist|"
     r"psychic|tarot|back office|administrator|paralegal|counsel|recruiter|talent community|"
     r"talent pool|copywriter|content writer|marketing|seo|growth marketing|customer support specialist|"
-    r"jobs|hiring|work from home|remote opportunity)\b",
+    r"jobs|hiring|work from home|remote opportunity|"
+    r"client relationship|relationship executive|relationship officer|key accounts|"
+    r"account manager|sales executive|telemarketing|insurance advisor|"
+    r"data entry|office assistant|office aide|sandwich artist|customer care|"
+    r"process associate|talent acquisition|hr assistant|accounts intern)\b",
     re.IGNORECASE,
 )
 
