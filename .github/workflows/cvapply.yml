@@ -57,4 +57,9 @@ jobs:
           DAILY_APP_CAP: "1000"
           ONLY_SRI_LANKA: "1"
         run: |
-          python -m cvapply.daemon --submit --interval 0 --batch-limit 100
+          # First live runs are capped at 10. Today's dry runs caught a sales role
+          # scored 100, five identical template letters and one recruiter
+          # addressed three times -- all guarded now, but an unknown fault
+          # should surface over 10 applications, not 100. Raise once a cycle
+          # has been read end to end.
+          python -m cvapply.daemon --submit --interval 0 --batch-limit 10
